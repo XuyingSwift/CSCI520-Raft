@@ -28,9 +28,16 @@
     <option name="showLibraryContents" value="true" />
   </component>
   <component name="PropertiesComponent">
+    <property name="Downloaded.Files.Path.Enabled" value="false" />
+    <property name="Repository.Attach.Annotations" value="false" />
+    <property name="Repository.Attach.JavaDocs" value="false" />
+    <property name="Repository.Attach.Sources" value="false" />
     <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
     <property name="WebServerToolWindowFactoryState" value="false" />
     <property name="aspect.path.notification.shown" value="true" />
+    <property name="project.structure.last.edited" value="Modules" />
+    <property name="project.structure.proportion" value="0.15" />
+    <property name="project.structure.side.proportion" value="0.32528734" />
   </component>
   <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
   <component name="TaskManager">
@@ -41,10 +48,33 @@
       <option name="presentableId" value="Default" />
       <updated>1649312613933</updated>
       <workItem from="1649312615078" duration="3385000" />
+      <workItem from="1649395462447" duration="6780000" />
     </task>
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
+  </component>
+  <component name="WindowStateProjectService">
+    <state x="1111" y="384" key="#com.intellij.openapi.roots.ui.configuration.libraryEditor.LibraryEditorDialog" timestamp="1649398048765">
+      <screen x="0" y="0" width="2560" height="1400" />
+    </state>
+    <state x="1111" y="384" key="#com.intellij.openapi.roots.ui.configuration.libraryEditor.LibraryEditorDialog/3840.0.2560.1400/0.0.2560.1400@0.0.2560.1400" timestamp="1649398048765" />
+    <state x="1064" y="591" key="#com.intellij.refactoring.move.moveClassesOrPackages.MoveClassesOrPackagesDialog.classes" timestamp="1649397445594">
+      <screen x="0" y="0" width="2560" height="1400" />
+    </state>
+    <state x="1064" y="591" key="#com.intellij.refactoring.move.moveClassesOrPackages.MoveClassesOrPackagesDialog.classes/3840.0.2560.1400/0.0.2560.1400@0.0.2560.1400" timestamp="1649397445594" />
+    <state x="1011" y="455" key="#com.intellij.util.ui.classpath.ChooseLibrariesDialog" timestamp="1649398052529">
+      <screen x="0" y="0" width="2560" height="1400" />
+    </state>
+    <state x="1011" y="455" key="#com.intellij.util.ui.classpath.ChooseLibrariesDialog/3840.0.2560.1400/0.0.2560.1400@0.0.2560.1400" timestamp="1649398052529" />
+    <state x="761" y="275" key="SettingsEditor" timestamp="1649398059158">
+      <screen x="0" y="0" width="2560" height="1400" />
+    </state>
+    <state x="761" y="275" key="SettingsEditor/3840.0.2560.1400/0.0.2560.1400@0.0.2560.1400" timestamp="1649398059158" />
+    <state x="1015" y="592" key="com.intellij.jarRepository.RepositoryAttachDialog-DOWNLOAD" timestamp="1649398040434">
+      <screen x="0" y="0" width="2560" height="1400" />
+    </state>
+    <state x="1015" y="592" key="com.intellij.jarRepository.RepositoryAttachDialog-DOWNLOAD/3840.0.2560.1400/0.0.2560.1400@0.0.2560.1400" timestamp="1649398040434" />
   </component>
 </project>

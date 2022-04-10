@@ -8,8 +8,8 @@ import java.net.Socket;
 
 public class MessagePasser extends Thread{
     private Socket socket;
-    private RaftNode node;
-    public static String success = "TRUE", fail = "FALSE";
+    private Node node;
+    public static String SUCCESS = "TRUE", FAIL = "FALSE";
 
     public MessagePasser(Socket socket, RaftNode node) {
         this.socket = socket;
@@ -48,7 +48,7 @@ public class MessagePasser extends Thread{
             node.getMessageResponses().remove(message.getGuid());
             System.out.println("MSG PASSER THREAD: Got response for " + message.getGuid() + " from " + message.getSender() + ": " + result);
 
-            socketOut.println(result ? success : fail);
+            socketOut.println(result ? SUCCESS : FAIL);
             socketOut.flush();
 
             socketIn.close();

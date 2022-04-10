@@ -11,8 +11,11 @@ public class RaftNode {
      * For leader: track state values: nextIndex[], matchIndex[]
      */
 
-    private final String append = "APPEND", requestVote = "REQ_VOTE";
-    private int port, id, term;
+public class RaftNode implements Node{
+    private final String APPEND = "APPEND", REQ_VOTE = "REQ_VOTE";
+    private final int HEARTBEAT_TIME = 50;
+    private int port, id;
+    private Client client;
     HashMap<Integer, RemoteNode> remoteNodes;
     volatile Queue<Message> messageQueue;
     volatile HashMap<UUID, Boolean> messageResponses;
@@ -87,7 +90,7 @@ public class RaftNode {
     private void sendAppendEntries(int dest) {
         Gson gson = new Gson();
         String payload = gson.toJson("foo" + id);
-        Message message = new Message(id, append, payload);
+        Message message = new Message(id, APPEND, payload);
         Client client = new Client(remoteNodes.get(dest).getAddress(), remoteNodes.get(dest).getPort(), dest, message);
 
         System.out.println("MAIN THREAD: Starting append entries message to node " + dest + ": " + message.getGuid());
@@ -98,7 +101,7 @@ public class RaftNode {
     private void sendRequestVote(int dest) {
         Gson gson = new Gson();
         String payload = gson.toJson("bar" + id);
-        Message message = new Message(id, requestVote, payload);
+        Message message = new Message(id, REQ_VOTE, payload);
         Client client = new Client(remoteNodes.get(dest).getAddress(), remoteNodes.get(dest).getPort(), dest, message);
 
         System.out.println("MAIN THREAD: Starting request vote message to node " + dest + ": " + message.getGuid());
@@ -137,12 +140,12 @@ public class RaftNode {
         }
         System.out.println("MAIN THREAD: Processing message " + curMessage.getGuid() + " from node " + curMessage.getSender() + " (" + curMessage.getType() + ")");
 
-        if (curMessage.getType().equals(append)) {
+        if (curMessage.getType().equals(APPEND)) {
             String payload = gson.fromJson(curMessage.getPayload(), String.class);
             retVal = receiveAppendEntries(payload);
             messageResponses.put(curMessage.getGuid(), retVal);
         }
-        else if (curMessage.getType().equals(requestVote)) {
+        else if (curMessage.getType().equals(REQ_VOTE)) {
             String payload = gson.fromJson(curMessage.getPayload(), String.class);
             retVal = receiveRequestVote(payload);
             messageResponses.put(curMessage.getGuid(), retVal);

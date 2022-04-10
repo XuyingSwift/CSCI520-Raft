@@ -45,7 +45,7 @@ public class Client extends Thread{
             String resp = socketIn.readLine();
             while(resp != null) {
                 //System.out.println(resp);
-                if (resp.equals(MessagePasser.fail)) success = false;
+                if (resp.equals(MessagePasser.FAIL)) success = false;
                 resp = socketIn.readLine();
             }
 

@@ -1,4 +1,4 @@
 public interface Node {
-    Boolean receiveMessage(Message message);
+    void receiveMessage(Message message);
     int getPort();
 }

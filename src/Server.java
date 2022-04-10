@@ -5,9 +5,9 @@ import java.net.Socket;
 public class Server extends Thread {
     private ServerSocket server;
     private boolean running;
-    private Node node;
+    private RaftNode node;
 
-    public Server(Node node) {
+    public Server(RaftNode node) {
         try {
             server = new ServerSocket(node.getPort());
         } catch (IOException e) {

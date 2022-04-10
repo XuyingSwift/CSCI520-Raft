@@ -27,13 +27,7 @@ public class RaftRunner {
             e.printStackTrace();
         }
 
-        for (int i = 0; i < 3; i++) {
-            if (i != id) {
-                node.sendAppendEntries(i);
-                node.sendRequestVote(i);
-            }
-
-        }
+        node.run();
 
         System.out.println("Press <enter> to quit...");
         try {

@@ -6,8 +6,24 @@ import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.net.Socket;
 
-public class Client {
-    public boolean sendMessage(String address, int port, Message message) {
+public class Client extends Thread{
+    String address;
+    int port, destNode;
+    Message message;
+
+    public Client(String address, int port, int destNode, Message message) {
+        this.address = address;
+        this.port = port;
+        this.destNode = destNode;
+        this.message = message;
+    }
+
+    public void run() {
+        boolean result = sendMessage();
+        System.out.println("CLIENT THREAD: Message " + message.getGuid() + " to " + destNode + ": " + result);
+    }
+
+    private boolean sendMessage() {
         System.out.println(Colors.ANSI_PURPLE + "*");
         System.out.println("* Sending message to " + address + ":" + port);
 

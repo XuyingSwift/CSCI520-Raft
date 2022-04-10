@@ -1,14 +1,10 @@
 import com.google.gson.Gson;
 
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.Queue;
-import java.util.UUID;
+import java.util.*;
 
 public class RaftNode implements Node{
     private final String append = "APPEND", requestVote = "REQ_VOTE";
     private int port, id;
-    private Client client;
     HashMap<Integer, RemoteNode> remoteNodes;
     volatile Queue<Message> messageQueue;
     volatile HashMap<UUID, Boolean> messageResponses;
@@ -16,31 +12,36 @@ public class RaftNode implements Node{
     public RaftNode(int id, int port, HashMap<Integer, RemoteNode> remoteNodes) {
         this.id = id;
         this.port = port;
-        client = new Client();
         messageQueue = new LinkedList<>();
         messageResponses = new HashMap<>();
         this.remoteNodes = remoteNodes;
     }
 
     public void run() {
-        //testing block
-        if (id == 0) {
-            for (int i = 0; i < 3; i++) {
-                if (i != id) {
-                    sendAppendEntries(i);
-                    sendRequestVote(i);
-                }
-            }
-        }
-        //end testing block
+        int curIndex = 0;
 
         while (true) {
-            while (!messageQueue.isEmpty()) {
-                Message curMessage = messageQueue.poll();
-                System.out.println("Processing message " + curMessage.getGuid() + " (" + curMessage.getType() + ")");
-                processMessage(curMessage);
+            try {
+                Thread.sleep(5000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
             }
 
+            curIndex++;
+            int destNode = curIndex % 3;
+            if (curIndex != id) {
+                Random rand = new Random();
+                if (rand.nextBoolean()) {
+                    sendAppendEntries(destNode);
+                }
+                else {
+                    sendRequestVote(destNode);
+                }
+            }
+
+            while (!messageQueue.isEmpty()) {
+                processMessage();
+            }
         }
     }
 
@@ -49,30 +50,37 @@ public class RaftNode implements Node{
     public void sendAppendEntries(int dest) {
         Gson gson = new Gson();
         String payload = gson.toJson("foo" + id);
-        Message message = new Message(append, payload);
-        boolean result = client.sendMessage(remoteNodes.get(dest).getAddress(), remoteNodes.get(dest).getPort(), message);
-        System.out.println("Append entries message " + message.getGuid() + ": " + result);
+        Message message = new Message(id, append, payload);
+        Client client = new Client(remoteNodes.get(dest).getAddress(), remoteNodes.get(dest).getPort(), dest, message);
+
+        System.out.println("MAIN THREAD: Starting append entries message to node " + dest + ": " + message.getGuid());
+        client.start();
     }
 
     public void sendRequestVote(int dest) {
         Gson gson = new Gson();
         String payload = gson.toJson("bar" + id);
-        Message message = new Message(requestVote, payload);
-        boolean result = client.sendMessage(remoteNodes.get(dest).getAddress(), remoteNodes.get(dest).getPort(), message);
-        System.out.println("Request vote message " + message.getGuid() + ": " + result);
+        Message message = new Message(id, requestVote, payload);
+        Client client = new Client(remoteNodes.get(dest).getAddress(), remoteNodes.get(dest).getPort(), dest, message);
+
+        System.out.println("MAIN THREAD: Starting request vote message to node " + dest + ": " + message.getGuid());
+        client.start();
     }
 
     private boolean receiveAppendEntries(String dummy) {
-        System.out.println("append_entries: " + dummy);
+        System.out.println("MAIN THREAD: append_entries: " + dummy);
         return true;
     }
 
     private boolean receiveRequestVote(String dummy) {
-        System.out.println("request_vote: " + dummy);
+        System.out.println("MAIN THREAD: request_vote: " + dummy);
         return true;
     }
 
-    public void receiveMessage(Message message) {
+    public synchronized void receiveMessage(Message message) {
+        if (message == null) {
+            System.out.println(Colors.ANSI_RED + "WARNING (" + Thread.currentThread().getName() + "): putting NULL message on queue" + Colors.ANSI_RESET);
+        }
         messageQueue.add(message);
     }
 
@@ -80,22 +88,29 @@ public class RaftNode implements Node{
         return messageResponses;
     }
 
-    private void processMessage(Message message) {
+    private synchronized void processMessage() {
         boolean retVal = false;
         Gson gson = new Gson();
 
-        if (message.getType().equals(append)) {
-            String payload = gson.fromJson(message.getPayload(), String.class);
-            retVal = receiveAppendEntries(payload);
-            messageResponses.put(message.getGuid(), retVal);
+        Message curMessage = messageQueue.poll();
+        if (curMessage == null) {
+            System.out.println("MAIN THREAD: Pulled NULL message off of queue");
+            //return;
         }
-        else if (message.getType().equals(requestVote)) {
-            String payload = gson.fromJson(message.getPayload(), String.class);
+        System.out.println("MAIN THREAD: Processing message " + curMessage.getGuid() + " from node " + curMessage.getSender() + " (" + curMessage.getType() + ")");
+
+        if (curMessage.getType().equals(append)) {
+            String payload = gson.fromJson(curMessage.getPayload(), String.class);
+            retVal = receiveAppendEntries(payload);
+            messageResponses.put(curMessage.getGuid(), retVal);
+        }
+        else if (curMessage.getType().equals(requestVote)) {
+            String payload = gson.fromJson(curMessage.getPayload(), String.class);
             retVal = receiveRequestVote(payload);
-            messageResponses.put(message.getGuid(), retVal);
+            messageResponses.put(curMessage.getGuid(), retVal);
         }
         else {
-            System.out.println(Colors.ANSI_RED + "***ERROR: UNSUPPORTED MESSAGE TYPE " + message.getType() + "***" + Colors.ANSI_RESET);
+            System.out.println(Colors.ANSI_RED + "***ERROR: UNSUPPORTED MESSAGE TYPE " + curMessage.getType() + "***" + Colors.ANSI_RESET);
         }
     }
 }

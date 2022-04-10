@@ -12,7 +12,7 @@ public class RaftNode {
      */
 
     private final String append = "APPEND", requestVote = "REQ_VOTE";
-    private int port, id;
+    private int port, id, term;
     HashMap<Integer, RemoteNode> remoteNodes;
     volatile Queue<Message> messageQueue;
     volatile HashMap<UUID, Boolean> messageResponses;
@@ -20,6 +20,7 @@ public class RaftNode {
     public RaftNode(int id, int port, HashMap<Integer, RemoteNode> remoteNodes) {
         this.id = id;
         this.port = port;
+        term = 0;
         messageQueue = new LinkedList<>();
         messageResponses = new HashMap<>();
         this.remoteNodes = remoteNodes;
@@ -69,6 +70,20 @@ public class RaftNode {
 
     public int getPort() { return port; }
 
+    private void startElection() {
+        term++;
+        int votes = 1; //start with vote for self
+        //reset election timer
+
+        //send a requestVote to all other nodes
+        for (Integer remoteNode : remoteNodes.keySet()) {
+            if (remoteNode.equals(id)) continue;
+            sendRequestVote(remoteNode);
+        }
+
+        //TODO: finish election logic
+    }
+
     private void sendAppendEntries(int dest) {
         Gson gson = new Gson();
         String payload = gson.toJson("foo" + id);
@@ -79,6 +94,7 @@ public class RaftNode {
         client.start();
     }
 
+    //TODO: implement sendRequestVote
     private void sendRequestVote(int dest) {
         Gson gson = new Gson();
         String payload = gson.toJson("bar" + id);
@@ -94,6 +110,7 @@ public class RaftNode {
         return true;
     }
 
+    //TODO: implement receiveRequestVote
     private boolean receiveRequestVote(String dummy) {
         System.out.println("MAIN THREAD: request_vote: " + dummy);
         return true;

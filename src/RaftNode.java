@@ -2,7 +2,15 @@ import com.google.gson.Gson;
 
 import java.util.*;
 
-public class RaftNode implements Node{
+public class RaftNode {
+    /* TODOS:
+     * Track node state (follower, candidate, or leader)
+     * Have an election timeout
+     * Keep a log
+     * Track state values: currentTerm, votedFor, commitIndex, lastApplied
+     * For leader: track state values: nextIndex[], matchIndex[]
+     */
+
     private final String append = "APPEND", requestVote = "REQ_VOTE";
     private int port, id;
     HashMap<Integer, RemoteNode> remoteNodes;
@@ -20,7 +28,20 @@ public class RaftNode implements Node{
     public void run() {
         int curIndex = 0;
 
+        /*
+         * WHILE TRUE:
+         * If leader then send heartbeat (empty append entries)
+         * Process any messages (while message queue is not empty...)
+         *      Reset election timer
+         * If timeout is expired, convert to candidate & start election
+         *      increment current term
+         *      vote for self
+         *      reset election timer
+         *      send requestVote to everyone else
+         */
+
         while (true) {
+            //------TESTING CODE-------
             try {
                 Thread.sleep(5000);
             } catch (InterruptedException e) {
@@ -38,6 +59,7 @@ public class RaftNode implements Node{
                     sendRequestVote(destNode);
                 }
             }
+            //------END TESTING CODE-------
 
             while (!messageQueue.isEmpty()) {
                 processMessage();
@@ -47,7 +69,7 @@ public class RaftNode implements Node{
 
     public int getPort() { return port; }
 
-    public void sendAppendEntries(int dest) {
+    private void sendAppendEntries(int dest) {
         Gson gson = new Gson();
         String payload = gson.toJson("foo" + id);
         Message message = new Message(id, append, payload);
@@ -57,7 +79,7 @@ public class RaftNode implements Node{
         client.start();
     }
 
-    public void sendRequestVote(int dest) {
+    private void sendRequestVote(int dest) {
         Gson gson = new Gson();
         String payload = gson.toJson("bar" + id);
         Message message = new Message(id, requestVote, payload);
@@ -95,7 +117,6 @@ public class RaftNode implements Node{
         Message curMessage = messageQueue.poll();
         if (curMessage == null) {
             System.out.println("MAIN THREAD: Pulled NULL message off of queue");
-            //return;
         }
         System.out.println("MAIN THREAD: Processing message " + curMessage.getGuid() + " from node " + curMessage.getSender() + " (" + curMessage.getType() + ")");
 

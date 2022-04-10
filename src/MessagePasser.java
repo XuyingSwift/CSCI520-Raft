@@ -8,7 +8,7 @@ import java.net.Socket;
 
 public class MessagePasser extends Thread{
     private Socket socket;
-    private Node node;
+    private RaftNode node;
     public static String SUCCESS = "TRUE", FAIL = "FALSE";
 
     public MessagePasser(Socket socket, RaftNode node) {
@@ -34,7 +34,6 @@ public class MessagePasser extends Thread{
                 msg = socketIn.readLine();
             }
 
-            //System.out.println(messageJson);
             Gson gson = new Gson();
             Message message = gson.fromJson(messageJson, Message.class);
             node.receiveMessage(message);

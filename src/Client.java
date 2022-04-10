@@ -38,13 +38,11 @@ public class Client extends Thread{
 
             Gson gson = new Gson();
             String messageJson = gson.toJson(message);
-            //System.out.println(messageJson);
             socketOut.println(messageJson);
             socketOut.println();
 
             String resp = socketIn.readLine();
             while(resp != null) {
-                //System.out.println(resp);
                 if (resp.equals(MessagePasser.FAIL)) success = false;
                 resp = socketIn.readLine();
             }

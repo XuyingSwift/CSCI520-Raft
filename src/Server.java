@@ -39,7 +39,6 @@ public class Server extends Thread {
             } catch (IOException ioException) {
                 System.out.println(Colors.ANSI_PURPLE + "* ");
                 System.out.println("* Closing server socket..." + Colors.ANSI_RESET);
-                //ioException.printStackTrace();
             }
         }
     }

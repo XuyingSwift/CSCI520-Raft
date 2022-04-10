@@ -2,19 +2,18 @@ import com.google.gson.Gson;
 
 import java.util.*;
 
-public class RaftNode {
-    /* TODOS:
-     * Track node state (follower, candidate, or leader)
-     * Have an election timeout
-     * Keep a log
-     * Track state values: currentTerm, votedFor, commitIndex, lastApplied
-     * For leader: track state values: nextIndex[], matchIndex[]
-     */
+/* TODOS:
+ * Track node state (follower, candidate, or leader)
+ * Have an election timeout
+ * Keep a log
+ * Track state values: currentTerm, votedFor, commitIndex, lastApplied
+ * For leader: track state values: nextIndex[], matchIndex[]
+ */
 
-public class RaftNode implements Node{
+public class RaftNode {
     private final String APPEND = "APPEND", REQ_VOTE = "REQ_VOTE";
     private final int HEARTBEAT_TIME = 50;
-    private int port, id;
+    private int port, id, term;
     private Client client;
     HashMap<Integer, RemoteNode> remoteNodes;
     volatile Queue<Message> messageQueue;

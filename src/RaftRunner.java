@@ -4,6 +4,8 @@ import java.io.InputStreamReader;
 import java.util.HashMap;
 
 public class RaftRunner {
+    public final static int SLOW_FACTOR = 10;
+
     public static void main(String[] args) {
         int id = Integer.parseInt(args[0]), port = Integer.parseInt(args[1]);
 

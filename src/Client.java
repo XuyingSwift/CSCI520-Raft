@@ -8,19 +8,27 @@ import java.net.Socket;
 
 public class Client extends Thread{
     String address;
-    int port, destNode;
+    int port;
     Message message;
+    RaftNode node;
 
-    public Client(String address, int port, int destNode, Message message) {
+    public Client(String address, int port, Message message, RaftNode node) {
         this.address = address;
         this.port = port;
-        this.destNode = destNode;
         this.message = message;
+        this.node = node;
     }
 
     public void run() {
         boolean result = sendMessage();
-        System.out.println("CLIENT THREAD: Message " + message.getGuid() + " to " + destNode + ": " + result);
+        System.out.println("CLIENT THREAD: Message " + message.getGuid() + " to " + message.getDestination() + ": " + result);
+
+        if (message.getType().equals(RaftNode.REQ_VOTE) && result) {
+            node.addVote(message.getTerm());
+        }
+        else if (message.getType().equals(RaftNode.APPEND) && !result) {
+            //TODO: logic for when AppendEntries RPC replies false
+        }
     }
 
     private boolean sendMessage() {
@@ -38,14 +46,12 @@ public class Client extends Thread{
 
             Gson gson = new Gson();
             String messageJson = gson.toJson(message);
-            //System.out.println(messageJson);
             socketOut.println(messageJson);
             socketOut.println();
 
             String resp = socketIn.readLine();
             while(resp != null) {
-                //System.out.println(resp);
-                if (resp.equals(MessagePasser.fail)) success = false;
+                if (resp.equals(MessagePasser.FAIL)) success = false;
                 resp = socketIn.readLine();
             }
 

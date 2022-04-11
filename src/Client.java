@@ -59,8 +59,10 @@ public class Client extends Thread{
             socketOut.close();
             socket.close();
         } catch (IOException e) {
-            System.out.println(Colors.ANSI_RESET);
-            e.printStackTrace();
+            System.out.println(Colors.ANSI_RED + "WARNING: Could not communicate with node " + message.getDestination() + Colors.ANSI_RESET);
+            if (message.getType().equals(RaftNode.REQ_VOTE)) success = false;
+            //System.out.println(Colors.ANSI_RESET);
+            //e.printStackTrace();
         }
 
         return success;

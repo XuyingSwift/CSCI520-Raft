@@ -13,10 +13,11 @@ import java.util.*;
 public class RaftNode {
     public static final String APPEND = "APPEND", REQ_VOTE = "REQ_VOTE";
     private final String FOLLOW = "FOLLOWER", CANDID = "CANDIDATE", LEADER = "LEADER";
-    private final int HEARTBEAT_TIME = 50, MAJORITY;
+    private final int HEARTBEAT_TIME = 50 * RaftRunner.SLOW_FACTOR, MAJORITY;
     private int port, id;
-    HashMap<Integer, RemoteNode> remoteNodes;
+    private HashMap<Integer, RemoteNode> remoteNodes;
 
+    volatile private ElectionTimer timer;
     volatile private Integer voteCount, votedFor, term, currentLeader;
     volatile private String state;
 
@@ -34,6 +35,7 @@ public class RaftNode {
         state = FOLLOW;
         MAJORITY = (int) Math.ceil(remoteNodes.size() / 2.0);
         currentLeader = null;
+        timer = new ElectionTimer();
     }
 
     public void run() {
@@ -48,29 +50,24 @@ public class RaftNode {
          *      reset election timer
          *      send requestVote to everyone else
          */
+        timer.start();
+        long lastHeartbeat = System.nanoTime();
 
-        boolean once = true;
         while (true) {
             if (state.equals(CANDID) && voteCount >= MAJORITY) {
                 becomeLeader();
             }
-            //send heartbeat
+
+            if (state.equals(LEADER) && ((System.nanoTime() - lastHeartbeat) / 1000000) >= HEARTBEAT_TIME) {
+                sendHeartbeat();
+                lastHeartbeat = System.nanoTime();
+            }
 
             while (!messageQueue.isEmpty()) {
                 processMessage();
             }
 
-            if (id == 0 && once) {
-                try {
-                    Thread.sleep(3000);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-
-                startElection();
-                once = false;
-            }
-            //if timer is expired, start election
+            if (timer.isExpired() && !state.equals(LEADER)) startElection();
         }
     }
 
@@ -85,15 +82,13 @@ public class RaftNode {
         term++;
         voteCount = 1; //start with vote for self
         votedFor = id;
-        //reset election timer
+        timer.reset();
 
         //send a requestVote to all other nodes
         for (Integer remoteNode : remoteNodes.keySet()) {
             if (remoteNode.equals(id)) continue;
             sendRequestVote(remoteNode);
         }
-
-        //TODO: finish election logic
     }
 
     private void becomeLeader() {
@@ -101,7 +96,7 @@ public class RaftNode {
             state = LEADER;
             currentLeader = id;
             System.out.println("MAIN THREAD: became the leader!!");
-
+            sendHeartbeat();
             //TODO: send empty AppendEntries messages to all other nodes
             for (Integer remoteNode : remoteNodes.keySet()) {
                 if (remoteNode.equals(id)) continue;
@@ -110,6 +105,13 @@ public class RaftNode {
         }
         else {
             System.out.println("MAIN THREAD: was trying to become leader but found a new leader");
+        }
+    }
+
+    private void sendHeartbeat() {
+        for (Integer remoteNode : remoteNodes.keySet()) {
+            if (remoteNode.equals(id)) continue;
+            sendAppendEntries(remoteNode);
         }
     }
 
@@ -135,14 +137,12 @@ public class RaftNode {
     }
 
     private boolean receiveAppendEntries(String dummy) {
-        //reset election timer
         System.out.println("MAIN THREAD: append_entries: " + dummy);
         return true;
     }
 
     //TODO: implement receiveRequestVote
     private boolean receiveRequestVote(String dummy) {
-        //reset election timer
         System.out.println("MAIN THREAD: request_vote: " + dummy);
         return true;
     }
@@ -152,7 +152,12 @@ public class RaftNode {
             System.out.println(Colors.ANSI_RED + "WARNING (" + Thread.currentThread().getName() + "): putting NULL message on queue" + Colors.ANSI_RESET);
         }
 
-        if (message.getTerm() > term && message.getType().equals(APPEND)) {
+        if (message.getType().equals(REQ_VOTE) && (message.getTerm() > term || (message.getTerm() >= term && votedFor.equals(message.getSender())))) {
+            timer.reset();
+        }
+
+        if (message.getTerm() >= term && message.getType().equals(APPEND)) {
+            timer.reset();
             currentLeader = message.getSender();
         }
 
@@ -170,7 +175,7 @@ public class RaftNode {
     }
 
     private synchronized void processMessage() {
-        boolean retVal = false;
+        boolean retVal;
         Gson gson = new Gson();
 
         Message curMessage = messageQueue.poll();

@@ -8,10 +8,10 @@ import java.net.Socket;
 
 public class MessagePasser extends Thread{
     private Socket socket;
-    private Node node;
-    public static String success = "TRUE", fail = "FALSE";
+    private RaftNode node;
+    public static String SUCCESS = "TRUE", FAIL = "FALSE";
 
-    public MessagePasser(Socket socket, Node node) {
+    public MessagePasser(Socket socket, RaftNode node) {
         this.socket = socket;
         this.node = node;
     }
@@ -34,12 +34,20 @@ public class MessagePasser extends Thread{
                 msg = socketIn.readLine();
             }
 
-            //System.out.println(messageJson);
             Gson gson = new Gson();
             Message message = gson.fromJson(messageJson, Message.class);
-            Boolean result = node.receiveMessage(message);
+            node.receiveMessage(message);
 
-            socketOut.println(result ? success : fail);
+            System.out.println("MSG PASSER THREAD: Added message " + message.getGuid() + " from " + message.getSender() + " to queue, waiting for response...");
+            while (!node.getMessageReplies().containsKey(message.getGuid())) {
+
+            }
+
+            Boolean result = node.getMessageReplies().get(message.getGuid());
+            node.getMessageReplies().remove(message.getGuid());
+            System.out.println("MSG PASSER THREAD: Got response for " + message.getGuid() + " from " + message.getSender() + ": " + result);
+
+            socketOut.println(result ? SUCCESS : FAIL);
             socketOut.flush();
 
             socketIn.close();

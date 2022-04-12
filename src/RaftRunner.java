@@ -4,6 +4,8 @@ import java.io.InputStreamReader;
 import java.util.HashMap;
 
 public class RaftRunner {
+    public final static int SLOW_FACTOR = 10;
+
     public static void main(String[] args) {
         int id = Integer.parseInt(args[0]), port = Integer.parseInt(args[1]);
 
@@ -27,13 +29,7 @@ public class RaftRunner {
             e.printStackTrace();
         }
 
-        for (int i = 0; i < 3; i++) {
-            if (i != id) {
-                node.sendAppendEntries(i);
-                node.sendRequestVote(i);
-            }
-
-        }
+        node.run();
 
         System.out.println("Press <enter> to quit...");
         try {

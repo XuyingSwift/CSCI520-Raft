@@ -6,8 +6,32 @@ import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.net.Socket;
 
-public class Client {
-    public boolean sendMessage(String address, int port, Message message) {
+public class Client extends Thread{
+    String address;
+    int port;
+    Message message;
+    RaftNode node;
+
+    public Client(String address, int port, Message message, RaftNode node) {
+        this.address = address;
+        this.port = port;
+        this.message = message;
+        this.node = node;
+    }
+
+    public void run() {
+        boolean result = sendMessage();
+        System.out.println("CLIENT THREAD: Message " + message.getGuid() + " to " + message.getDestination() + ": " + result);
+
+        if (message.getType().equals(RaftNode.REQ_VOTE) && result) {
+            node.addVote(message.getTerm());
+        }
+        else if (message.getType().equals(RaftNode.APPEND) && !result) {
+            //TODO: logic for when AppendEntries RPC replies false
+        }
+    }
+
+    private boolean sendMessage() {
         System.out.println(Colors.ANSI_PURPLE + "*");
         System.out.println("* Sending message to " + address + ":" + port);
 
@@ -22,14 +46,12 @@ public class Client {
 
             Gson gson = new Gson();
             String messageJson = gson.toJson(message);
-            //System.out.println(messageJson);
             socketOut.println(messageJson);
             socketOut.println();
 
             String resp = socketIn.readLine();
             while(resp != null) {
-                //System.out.println(resp);
-                if (resp.equals(MessagePasser.fail)) success = false;
+                if (resp.equals(MessagePasser.FAIL)) success = false;
                 resp = socketIn.readLine();
             }
 
@@ -37,8 +59,10 @@ public class Client {
             socketOut.close();
             socket.close();
         } catch (IOException e) {
-            System.out.println(Colors.ANSI_RESET);
-            e.printStackTrace();
+            System.out.println(Colors.ANSI_RED + "WARNING: Could not communicate with node " + message.getDestination() + Colors.ANSI_RESET);
+            if (message.getType().equals(RaftNode.REQ_VOTE)) success = false;
+            //System.out.println(Colors.ANSI_RESET);
+            //e.printStackTrace();
         }
 
         return success;

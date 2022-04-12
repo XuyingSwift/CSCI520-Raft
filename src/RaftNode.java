@@ -1,4 +1,6 @@
 import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 import java.util.*;
 
@@ -11,8 +13,9 @@ import java.util.*;
  */
 
 public class RaftNode {
-    public static final String APPEND = "APPEND", REQ_VOTE = "REQ_VOTE";
+    public static final String APPEND = "APPEND", REQ_VOTE = "REQ_VOTE", CANDIDATE_ID = "candidateId", CANDIDATE_TERM = "candidateTerm" ;
     private final String FOLLOW = "FOLLOWER", CANDID = "CANDIDATE", LEADER = "LEADER";
+
     private final int HEARTBEAT_TIME = 50 * RaftRunner.SLOW_FACTOR, MAJORITY;
     private int port, id;
     private HashMap<Integer, RemoteNode> remoteNodes;
@@ -128,7 +131,16 @@ public class RaftNode {
     //TODO: implement sendRequestVote
     private void sendRequestVote(int dest) {
         Gson gson = new Gson();
-        String payload = gson.toJson("bar" + id);
+        HashMap<String, String> voteInfo = new HashMap<>();
+        // candidate requesting vote
+        voteInfo.put(CANDIDATE_ID, String.valueOf(id));
+        // candidate’s term
+        voteInfo.put(CANDIDATE_TERM, String.valueOf(term));
+
+        //TODO: lastLogIndex
+        //TODO: lastLogTerm
+
+        String payload = gson.toJson(voteInfo);
         Message message = new Message(id, dest, term, REQ_VOTE, payload);
         Client client = new Client(remoteNodes.get(dest).getAddress(), remoteNodes.get(dest).getPort(), message, this);
 
@@ -136,14 +148,22 @@ public class RaftNode {
         client.start();
     }
 
-    private boolean receiveAppendEntries(String dummy) {
-        System.out.println("MAIN THREAD: append_entries: " + dummy);
-        return true;
+    //TODO: implement receiveRequestVote
+    private boolean receiveRequestVote(String payload) {
+        boolean votedFor = true;
+        JsonObject jsonObject = new JsonParser().parse(payload).getAsJsonObject();
+        // Reply false if term < currentTerm
+        if (jsonObject.get(CANDIDATE_TERM).getAsInt() < this.term) {
+            votedFor = false;
+        }
+        // If votedFor is null or candidateId, and candidate’s log is at
+        //least as up-to-date as receiver’s log, grant vote
+        return votedFor;
     }
 
-    //TODO: implement receiveRequestVote
-    private boolean receiveRequestVote(String dummy) {
-        System.out.println("MAIN THREAD: request_vote: " + dummy);
+    private boolean receiveAppendEntries(String dummy) {
+        System.out.println("MAIN THREAD: append_entries: " + dummy);
+
         return true;
     }
 

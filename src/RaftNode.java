@@ -21,8 +21,14 @@ public class RaftNode {
 
     private HashMap<Integer, RemoteNode> remoteNodes;
 
+    private ArrayList<ReplicatedLog> logs;
+    private int[] nextIndex;
+    private int[] matchIndex;
+    private int commitIndex;
+    private int lastApplied;
+
     volatile private ElectionTimer timer;
-    volatile private Integer voteCount, votedFor, term, currentLeader, savedCurrentTerm;
+    volatile private Integer voteCount, votedFor, term, currentLeader;
     volatile private String state;
 
     volatile Queue<Message> messageQueue; //queue of incoming messages to process
@@ -40,6 +46,7 @@ public class RaftNode {
         MAJORITY = (int) Math.ceil(remoteNodes.size() / 2.0);
         currentLeader = null;
         timer = new ElectionTimer();
+        logs = new ArrayList<>();
     }
 
     public void run() {
@@ -141,7 +148,10 @@ public class RaftNode {
         }
     }
 
+    // TODO: finish this method
     private void sendAppendEntries(int dest) {
+        // send the log and leaderId, prelogindex
+        //
         Gson gson = new Gson();
         String payload = gson.toJson("foo" + id);
         Message message = new Message(id, dest, term, APPEND, payload);

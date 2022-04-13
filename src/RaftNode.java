@@ -21,7 +21,7 @@ public class RaftNode {
     private HashMap<Integer, RemoteNode> remoteNodes;
 
     volatile private ElectionTimer timer;
-    volatile private Integer voteCount, votedFor, term, currentLeader;
+    volatile private Integer voteCount, votedFor, term, currentLeader, savedCurrentTerm;
     volatile private String state;
 
     volatile Queue<Message> messageQueue; //queue of incoming messages to process
@@ -81,10 +81,15 @@ public class RaftNode {
     }
 
     private void startElection() {
+        // switch to candidate state
         state = CANDID;
+        // increment its term
         term++;
-        voteCount = 1; //start with vote for self
+        //start with vote for self
+        voteCount = 1;
+        // set voted for to the candidate id
         votedFor = id;
+        // reset the term timer
         timer.reset();
 
         //send a requestVote to all other nodes
@@ -92,6 +97,12 @@ public class RaftNode {
             if (remoteNode.equals(id)) continue;
             sendRequestVote(remoteNode);
         }
+        // If the RPC succeeds, some time has passed, we have to check the state to see what our options are.
+        // If our state is no longer candidate, bail out.
+        // If we're still a candidate when the reply is back, we check the term of the reply and compare it
+        // to the original term we were on when we sent the request.
+        // If the reply's term is higher, we revert to a follower state.
+        // This can happen if another candidate won an election while we were collecting votes
     }
 
     private void becomeLeader() {
@@ -111,6 +122,17 @@ public class RaftNode {
         }
     }
 
+    // if the RPC returns a term higher than our own,
+    // this peer switches to become a follower
+    private void becomeFollower(int savedCurrentTerm) {
+        System.out.println("Become follower with term: " + term);
+        state = FOLLOW;
+        term = savedCurrentTerm;
+        votedFor = -1;
+
+        // something with the timer...
+
+    }
     private void sendHeartbeat() {
         for (Integer remoteNode : remoteNodes.keySet()) {
             if (remoteNode.equals(id)) continue;
@@ -130,6 +152,7 @@ public class RaftNode {
 
     //TODO: implement sendRequestVote
     private void sendRequestVote(int dest) {
+
         Gson gson = new Gson();
         HashMap<String, String> voteInfo = new HashMap<>();
         // candidate requesting vote
@@ -150,6 +173,18 @@ public class RaftNode {
 
     //TODO: implement receiveRequestVote
     private boolean receiveRequestVote(String payload) {
+        StringBuilder sb = new StringBuilder();
+        System.out.println("Request Vote: " + "term: " + term + "votedFor: " + votedFor);
+        // if the dest term is higher than my term
+        System.out.println("dest term is out date in request vote");
+        // this node become follower
+        // if dest term and my term are equal, and my votedFor == -1 and my votedFor == CANDIDATE_ID.
+        // reply that vote granted true
+        // votedfor = CANDIDATE_ID
+        // eltection restart
+        //else grantedvote false
+        System.out.println("Reply vote" + "currentTerm" );
+
         boolean votedFor = true;
         JsonObject jsonObject = new JsonParser().parse(payload).getAsJsonObject();
         // Reply false if term < currentTerm

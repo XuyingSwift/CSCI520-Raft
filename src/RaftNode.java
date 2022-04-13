@@ -156,6 +156,7 @@ public class RaftNode {
 
         Gson gson = new Gson();
         HashMap<String, String> voteInfo = new HashMap<>();
+
         // candidate requesting vote
         voteInfo.put(CANDIDATE_ID, String.valueOf(id));
         // candidate’s term
@@ -174,26 +175,17 @@ public class RaftNode {
 
     //TODO: implement receiveRequestVote
     private boolean receiveRequestVote(String payload) {
-        StringBuilder reply = new StringBuilder();
+        boolean grantedVote = false;
         System.out.println("Request Vote: " + "term: " + term + "votedFor: " + votedFor);
         JsonObject jsonObject = new JsonParser().parse(payload).getAsJsonObject();
-        // if the dest term is higher than my term
-        if (jsonObject.get(CANDIDATE_TERM).getAsInt() > this.term) {
-            System.out.println("dest term is out date in request vote");
-            // this node become follower
-            becomeFollower(this.term);
+        // if the sending node's term is higher than my term
+        if (jsonObject.get(CANDIDATE_TERM).getAsInt() >= this.term
+                && (votedFor == null || votedFor == jsonObject.get(CANDIDATE_ID).getAsInt() )) {
+            grantedVote = true;
+            votedFor = jsonObject.get(CANDIDATE_ID).getAsInt();
         }
-        // if dest term and my term are equal, and my votedFor == -1 || my votedFor == CANDIDATE_ID.
-        if (jsonObject.get(CANDIDATE_TERM).getAsInt() == this.term
-                && (votedFor == Integer.valueOf(-1) || votedFor == Integer.valueOf(jsonObject.get(CANDIDATE_ID).getAsInt()))) {
-            // reply that vote granted true
-            reply.append(true);
-        }else {
-            reply.append(false);
-        }
-        reply.append(term);
-        // return a string
-        return true;
+
+        return grantedVote;
     }
 
     private boolean receiveAppendEntries(String dummy) {

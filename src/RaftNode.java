@@ -18,6 +18,7 @@ public class RaftNode {
 
     private final int HEARTBEAT_TIME = 50 * RaftRunner.SLOW_FACTOR, MAJORITY;
     private int port, id;
+
     private HashMap<Integer, RemoteNode> remoteNodes;
 
     volatile private ElectionTimer timer;
@@ -173,27 +174,26 @@ public class RaftNode {
 
     //TODO: implement receiveRequestVote
     private boolean receiveRequestVote(String payload) {
-        StringBuilder sb = new StringBuilder();
+        StringBuilder reply = new StringBuilder();
         System.out.println("Request Vote: " + "term: " + term + "votedFor: " + votedFor);
-        // if the dest term is higher than my term
-        System.out.println("dest term is out date in request vote");
-        // this node become follower
-        // if dest term and my term are equal, and my votedFor == -1 and my votedFor == CANDIDATE_ID.
-        // reply that vote granted true
-        // votedfor = CANDIDATE_ID
-        // eltection restart
-        //else grantedvote false
-        System.out.println("Reply vote" + "currentTerm" );
-
-        boolean votedFor = true;
         JsonObject jsonObject = new JsonParser().parse(payload).getAsJsonObject();
-        // Reply false if term < currentTerm
-        if (jsonObject.get(CANDIDATE_TERM).getAsInt() < this.term) {
-            votedFor = false;
+        // if the dest term is higher than my term
+        if (jsonObject.get(CANDIDATE_TERM).getAsInt() > this.term) {
+            System.out.println("dest term is out date in request vote");
+            // this node become follower
+            becomeFollower(this.term);
         }
-        // If votedFor is null or candidateId, and candidate’s log is at
-        //least as up-to-date as receiver’s log, grant vote
-        return votedFor;
+        // if dest term and my term are equal, and my votedFor == -1 || my votedFor == CANDIDATE_ID.
+        if (jsonObject.get(CANDIDATE_TERM).getAsInt() == this.term
+                && (votedFor == Integer.valueOf(-1) || votedFor == Integer.valueOf(jsonObject.get(CANDIDATE_ID).getAsInt()))) {
+            // reply that vote granted true
+            reply.append(true);
+        }else {
+            reply.append(false);
+        }
+        reply.append(term);
+        // return a string
+        return true;
     }
 
     private boolean receiveAppendEntries(String dummy) {

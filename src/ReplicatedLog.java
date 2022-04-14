@@ -3,14 +3,9 @@ public class ReplicatedLog {
     private int term;
     private String command;
 
-    public ReplicatedLog(int index, int term, String command) {
-        this.index = index;
+    public ReplicatedLog(int term, String command) {
         this.term = term;
         this.command = command;
-    }
-
-    public int getIndex() {
-        return index;
     }
 
     public int getTerm() {

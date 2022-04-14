@@ -26,8 +26,13 @@ public class Client extends Thread{
         if (message.getType().equals(RaftNode.REQ_VOTE) && result) {
             node.addVote(message.getTerm());
         }
+        else if (message.getType().equals(RaftNode.APPEND) && result) {
+            //TODO
+            //node.increaseNextIndex(message.getDestination(), );
+        }
         else if (message.getType().equals(RaftNode.APPEND) && !result) {
             //TODO: logic for when AppendEntries RPC replies false
+            node.decrementNextIndex(message.getDestination());
         }
     }
 

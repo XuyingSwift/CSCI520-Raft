@@ -176,11 +176,55 @@ public class RaftNode {
         client.start();
     }
 
-    private boolean receiveAppendEntries(String dummy) {
-        System.out.println("MAIN THREAD: append_entries: " + dummy);
+    private boolean receiveAppendEntries(String payload) {
+        JsonObject jsonObject = new JsonParser().parse(payload).getAsJsonObject();
+        boolean addedEntries;
 
-        return true;
+        if (jsonObject.get(LEADER_TERM).getAsInt() < term) {
+            System.out.println("MAIN THREAD: append_entries: had old term");
+            addedEntries = false;
+        }
+        //checks if we have a log entry at prevLogIndex (from Leader)
+        else if (jsonObject.get(PREV_LOG_INDEX).getAsInt() > logs.size() - 1) {
+            System.out.println("MAIN THREAD: append_entries: have no log entry at prev index");
+            addedEntries = false;
+        }
+        //checks if the log entry at prevLogIndex (from Leader) has a matching term
+        else if (logs.get(jsonObject.get(PREV_LOG_INDEX).getAsInt()).getTerm()
+                    != jsonObject.get(PREV_LOG_TERM).getAsInt()
+        ) {
+            System.out.println("MAIN THREAD: append_entries: mismatch term at prev index");
+            addedEntries = false;
+        }
+        else {
+            Gson gson = new Gson();
+            ArrayList<ReplicatedLog> newEntries = gson.fromJson(jsonObject.get(ENTRIES).getAsString(), ArrayList.class);
+
+            System.out.println("MAIN THREAD: append_entries: adding log entries " + jsonObject.get(ENTRIES).getAsString());
+            int index = jsonObject.get(PREV_LOG_INDEX).getAsInt();
+            for (ReplicatedLog curEntry : newEntries) {
+                logs.add(index, curEntry);
+                index++;
+            }
+
+            if (jsonObject.get(LEADER_COMMIT).getAsInt() > commitIndex) {
+                commitIndex = Math.min(jsonObject.get(LEADER_COMMIT).getAsInt(), logs.size() - 1);
+            }
+            addedEntries = true;
+        }
+
+        return addedEntries;
     }
+
+    public void decrementNextIndex(int destination) {
+        nextIndex[destination]--;
+    }
+
+    //TODO
+    /*
+    public void increaseNextIndex(int destination, ) {
+
+    }*/
 
     //TODO: implement sendRequestVote
     private void sendRequestVote(int dest) {

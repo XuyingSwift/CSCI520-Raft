@@ -13,9 +13,10 @@ import java.util.*;
  */
 
 public class RaftNode {
-    public static final String APPEND = "APPEND", REQ_VOTE = "REQ_VOTE",
+    public static final String APPEND = "APPEND", REQ_VOTE = "REQ_VOTE", COMMAND = "COMMAND",
             CANDIDATE_ID = "candidateId", CANDIDATE_TERM = "candidateTerm",
-            LEADER_TERM = "leaderTerm", LEADER_ID = "leaderId";
+            LEADER_TERM = "leaderTerm", LEADER_ID = "leaderId",
+            PREV_LOG_INDEX = "prevLogIndex", PREV_LOG_TERM = "prevLogTerm", ENTRIES = "entries", LEADER_COMMIT = "leaderCommit";
     private final String FOLLOW = "FOLLOWER", CANDID = "CANDIDATE", LEADER = "LEADER";
 
     private final int HEARTBEAT_TIME = 50 * RaftRunner.SLOW_FACTOR, MAJORITY;
@@ -30,7 +31,7 @@ public class RaftNode {
     private int lastApplied;
 
     volatile private ElectionTimer timer;
-    volatile private Integer voteCount, votedFor, term, currentLeader, currentTerm;
+    volatile private Integer voteCount, votedFor, term, currentLeader;
     volatile private String state;
 
     volatile Queue<Message> messageQueue; //queue of incoming messages to process
@@ -47,9 +48,10 @@ public class RaftNode {
         state = FOLLOW;
         MAJORITY = (int) Math.ceil(remoteNodes.size() / 2.0);
         currentLeader = null;
-        currentTerm = null;
         timer = new ElectionTimer();
         logs = new ArrayList<>();
+        nextIndex = new int[remoteNodes.size()];
+        commitIndex = -1;
     }
 
     public void run() {
@@ -120,64 +122,64 @@ public class RaftNode {
         if (state.equals(CANDID)) {
             state = LEADER;
             currentLeader = id;
-            currentTerm = term;
-            // we need leader's id and leader's term
-            HashMap<String, String> entries = new HashMap<>();
-            entries.put(LEADER_TERM, String.valueOf(currentLeader));
-            entries.put(LEADER_ID, String.valueOf(currentTerm));
-            ReplicatedLog log = new ReplicatedLog(term, null);
-            logs.add(log);
+
             System.out.println("MAIN THREAD: became the leader!!");
+            //TODO: we could send an empty AppendEntries instead of a heartbeat
             sendHeartbeat();
-            //TODO: send empty AppendEntries messages to all other nodes
-            HashMap<String, Object> logInfo = new HashMap<>();
-            for (Integer remoteNode : remoteNodes.keySet()) {
-                if (remoteNode.equals(id)) continue;
-                logInfo.put("DestinationNode", remoteNode);
-                logInfo.put("Entries", entries);
-                logInfo.put("LogInfo", logs);
-                logInfo.put("Index", logs.indexOf(log));
-                sendAppendEntries(logInfo);
-            }
         }
         else {
             System.out.println("MAIN THREAD: was trying to become leader but found a new leader");
         }
     }
 
-    // if the RPC returns a term higher than our own,
-    // this peer switches to become a follower
-    private void becomeFollower(int savedCurrentTerm) {
-        System.out.println("Become follower with term: " + term);
-        state = FOLLOW;
-        term = savedCurrentTerm;
-        votedFor = -1;
-
-        // something with the timer...
-
-    }
     private void sendHeartbeat() {
-        HashMap<String, Object> logInfo = new HashMap<>();
         for (Integer remoteNode : remoteNodes.keySet()) {
             if (remoteNode.equals(id)) continue;
-            logInfo.put("TargetNode", remoteNode);
-            sendAppendEntries(logInfo);
+            sendAppendEntries(remoteNode);
         }
     }
 
     // TODO: finish this method
-    private void sendAppendEntries(HashMap<String, Object> logInfo) {
+    private void sendAppendEntries(int dest) {
         // send the log and leaderId, prelogindex
-
         Gson gson = new Gson();
+        HashMap<String, Object> logInfo = new HashMap<>();
+        logInfo.put(LEADER_TERM, term);
+        logInfo.put(LEADER_ID, id);
+        logInfo.put(PREV_LOG_INDEX, nextIndex[dest] - 1);
+
+        if (nextIndex[dest] > 0) {
+            logInfo.put(PREV_LOG_TERM, logs.get(nextIndex[dest] - 1));
+        }
+        else {
+            logInfo.put(PREV_LOG_TERM, null);
+        }
+
+        logInfo.put(LEADER_COMMIT, commitIndex);
+
+        //if logs last index is greater than or equal to nextIndex for the destination node
+        if (logs.size() - 1 >= nextIndex[dest]) {//send everything from nextIndex[dest] to the end of the log
+            ArrayList<ReplicatedLog> entriesToSend = (ArrayList<ReplicatedLog>) logs.subList(nextIndex[dest], logs.size() - 1);
+            logInfo.put(ENTRIES, gson.toJson(entriesToSend));
+        }
+        else {
+            logInfo.put(ENTRIES, null);
+        }
+
         String payload = gson.toJson(logInfo);
-        int dest = (Integer) logInfo.get("DestinationNode");
-        Message message = new Message(id,dest , term, APPEND, payload);
+
+        Message message = new Message(id, dest, term, APPEND, payload);
         Client client = new Client(remoteNodes.get(dest).getAddress(),
                 remoteNodes.get(dest).getPort(), message, this);
 
         System.out.println("MAIN THREAD: Starting append entries message to node " + logInfo.get("DestinationNode") + ": " + message.getGuid());
         client.start();
+    }
+
+    private boolean receiveAppendEntries(String dummy) {
+        System.out.println("MAIN THREAD: append_entries: " + dummy);
+
+        return true;
     }
 
     //TODO: implement sendRequestVote
@@ -217,10 +219,17 @@ public class RaftNode {
         return grantedVote;
     }
 
-    private boolean receiveAppendEntries(String dummy) {
-        System.out.println("MAIN THREAD: append_entries: " + dummy);
-
-        return true;
+    private boolean receiveCommand(String payload) {
+        if (!state.equals(LEADER)) {
+            System.out.println(Colors.ANSI_RED + "MAIN THREAD: not the leader but tried to process a command" + Colors.ANSI_RESET);
+            return false;
+        }
+        else {
+            JsonObject jsonObject = new JsonParser().parse(payload).getAsJsonObject();
+            ReplicatedLog newLog = new ReplicatedLog(term, "dummy command");
+            logs.add(newLog);
+            return true;
+        }
     }
 
     public synchronized void receiveMessage(Message message) {
@@ -267,6 +276,10 @@ public class RaftNode {
         }
         else if (curMessage.getType().equals(REQ_VOTE)) {
             retVal = receiveRequestVote(curMessage.getPayload());
+            messageReplies.put(curMessage.getGuid(), retVal);
+        }
+        else if (curMessage.getType().equals(COMMAND)) {
+            retVal = receiveCommand(curMessage.getPayload());
             messageReplies.put(curMessage.getGuid(), retVal);
         }
         else {

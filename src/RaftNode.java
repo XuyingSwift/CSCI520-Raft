@@ -266,8 +266,7 @@ public class RaftNode {
             messageReplies.put(curMessage.getGuid(), retVal);
         }
         else if (curMessage.getType().equals(REQ_VOTE)) {
-            String payload = gson.fromJson(curMessage.getPayload(), String.class);
-            retVal = receiveRequestVote(payload);
+            retVal = receiveRequestVote(curMessage.getPayload());
             messageReplies.put(curMessage.getGuid(), retVal);
         }
         else {

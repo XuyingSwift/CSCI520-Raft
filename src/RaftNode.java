@@ -118,6 +118,7 @@ public class RaftNode {
             currentLeader = id;
 
             System.out.println("MAIN THREAD: became the leader!!");
+            Arrays.fill(nextIndex, logs.size()); //re-initialize next index array
             //TODO: we could send an empty AppendEntries instead of a heartbeat
             sendHeartbeat();
         }

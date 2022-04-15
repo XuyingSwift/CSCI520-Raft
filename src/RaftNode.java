@@ -25,11 +25,11 @@ public class RaftNode {
     private HashMap<Integer, RemoteNode> remoteNodes;
 
     private ArrayList<ReplicatedLog> logs;
-    private int[] nextIndex;
     private int[] matchIndex;
     private int commitIndex;
     private int lastApplied;
 
+    volatile private int[] nextIndex;
     volatile private ElectionTimer timer;
     volatile private Integer voteCount, votedFor, term, currentLeader;
     volatile private String state;
@@ -134,7 +134,6 @@ public class RaftNode {
         }
     }
 
-    // TODO: finish this method
     private void sendAppendEntries(int dest) {
         // send the log and leaderId, prelogindex
         Gson gson = new Gson();
@@ -216,11 +215,11 @@ public class RaftNode {
         return response.getAsString();
     }
 
-    public void decrementNextIndex(int destination) {
+    public synchronized void decrementNextIndex(int destination) {
         nextIndex[destination]--;
     }
 
-    public void increaseNextIndex(int destination, int newNextIndex) { nextIndex[destination] = newNextIndex; }
+    public synchronized void increaseNextIndex(int destination, int newNextIndex) { nextIndex[destination] = newNextIndex; }
 
     //TODO: implement sendRequestVote
     private void sendRequestVote(int dest) {

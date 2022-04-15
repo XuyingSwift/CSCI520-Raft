@@ -3,19 +3,12 @@ import com.google.gson.reflect.TypeToken;
 
 import java.util.*;
 
-/* TODOS:
- * Track node state (follower, candidate, or leader)
- * Have an election timeout
- * Keep a log
- * Track state values: currentTerm, votedFor, commitIndex, lastApplied
- * For leader: track state values: nextIndex[], matchIndex[]
- */
-
 public class RaftNode {
     public static final String APPEND = "APPEND", REQ_VOTE = "REQ_VOTE", COMMAND = "COMMAND",
             CANDIDATE_ID = "candidateId", CANDIDATE_TERM = "candidateTerm",
             LEADER_TERM = "leaderTerm", LEADER_ID = "leaderId",
-            PREV_LOG_INDEX = "prevLogIndex", PREV_LOG_TERM = "prevLogTerm", ENTRIES = "entries", LEADER_COMMIT = "leaderCommit";
+            PREV_LOG_INDEX = "prevLogIndex", PREV_LOG_TERM = "prevLogTerm", ENTRIES = "entries", LEADER_COMMIT = "leaderCommit",
+            LAST_LOG_INDEX = "lastLogIndex", LAST_LOG_TERM = "lastLogTerm";
     private final String FOLLOW = "FOLLOWER", CANDID = "CANDIDATE", LEADER = "LEADER";
 
     private final int HEARTBEAT_TIME = 50 * RaftRunner.SLOW_FACTOR, MAJORITY;
@@ -241,18 +234,23 @@ public class RaftNode {
 
     //TODO: implement sendRequestVote
     private void sendRequestVote(int dest) {
-
-        Gson gson = new Gson();
-        HashMap<String, String> voteInfo = new HashMap<>();
+        HashMap<String, Object> voteInfo = new HashMap<>();
 
         // candidate requesting vote
         voteInfo.put(CANDIDATE_ID, String.valueOf(id));
         // candidate’s term
         voteInfo.put(CANDIDATE_TERM, String.valueOf(term));
+        //last index of candidate's log
+        voteInfo.put(LAST_LOG_INDEX, logs.size() - 1);
+        //term of candidates last log entry
+        if (logs.size() > 0) {
+            voteInfo.put(LAST_LOG_TERM, logs.get(logs.size() - 1).getTerm());
+        }
+        else {
+            voteInfo.put(LAST_LOG_TERM, null);
+        }
 
-        //TODO: lastLogIndex
-        //TODO: lastLogTerm
-
+        Gson gson = new GsonBuilder().serializeNulls().create();
         String payload = gson.toJson(voteInfo);
         Message message = new Message(id, dest, term, REQ_VOTE, payload);
         Client client = new Client(remoteNodes.get(dest).getAddress(), remoteNodes.get(dest).getPort(), message, this);
@@ -265,12 +263,43 @@ public class RaftNode {
         JsonObject response = new JsonObject();
         System.out.println("Request Vote: " + "term: " + term + "votedFor: " + votedFor);
 
+        //TODO: lastLogIndex
+        //TODO: lastLogTerm
+
         JsonObject jsonObject = new JsonParser().parse(payload).getAsJsonObject();
-        // if the sending node's term is higher than my term
+        //if the sending node's term is at least as high as my term
+        //and either I haven't voted yet, or I already voted for this node,
+        //maybe grant vote
         if (jsonObject.get(CANDIDATE_TERM).getAsInt() >= this.term
                 && (votedFor == null || votedFor == jsonObject.get(CANDIDATE_ID).getAsInt() )) {
-            response.addProperty("result", true);
-            votedFor = jsonObject.get(CANDIDATE_ID).getAsInt();
+
+            boolean logIsUpToDate;
+            //check if candidate's log is as up to date as mine
+            if (logs.size() == 0) {
+                logIsUpToDate = true; //I have no logs yet
+            }
+            else if (jsonObject.get(LAST_LOG_INDEX).getAsInt() == -1) {
+                logIsUpToDate = false; //Candidate has no logs, but I do
+            }
+            else { //me and the candidate both have logs
+                if (jsonObject.get(LAST_LOG_TERM).getAsInt() > logs.get(logs.size() - 1).getTerm()) {
+                    logIsUpToDate = true;
+                }
+                else if (jsonObject.get(LAST_LOG_TERM).getAsInt() < logs.get(logs.size() - 1).getTerm()) {
+                    logIsUpToDate = false;
+                }
+                else { //terms are equal - whose log is longer?
+                    logIsUpToDate = jsonObject.get(LAST_LOG_INDEX).getAsInt() >= logs.size() - 1;
+                }
+            }
+
+            if (logIsUpToDate) {
+                response.addProperty("result", true);
+                votedFor = jsonObject.get(CANDIDATE_ID).getAsInt();
+            }
+            else {
+                response.addProperty("result", false);
+            }
         }
         else {
             response.addProperty("result", false);

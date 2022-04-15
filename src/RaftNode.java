@@ -69,6 +69,7 @@ public class RaftNode {
         timer.start();
         long lastHeartbeat = System.nanoTime();
 
+        int counter = 0; //FOR TESTING ONLY
         while (true) {
             if (state.equals(CANDID) && voteCount >= MAJORITY) {
                 becomeLeader();
@@ -77,6 +78,15 @@ public class RaftNode {
             if (state.equals(LEADER) && ((System.nanoTime() - lastHeartbeat) / 1000000) >= HEARTBEAT_TIME) {
                 sendHeartbeat();
                 lastHeartbeat = System.nanoTime();
+
+                //TESTING BLOCK
+                //add an entry to the log on an average of 1 out of every 10 heartbeats
+                Random rand = new Random();
+                counter++;
+                if (rand.nextInt(10) == 4) {
+                    logs.add(new ReplicatedLog(term, "command #" + counter));
+                }
+                //END TESTING BLOCK
             }
 
             while (!messageQueue.isEmpty()) {

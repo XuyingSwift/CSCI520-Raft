@@ -35,7 +35,7 @@ public class RaftNode {
     volatile private String state;
 
     volatile Queue<Message> messageQueue; //queue of incoming messages to process
-    volatile HashMap<UUID, Boolean> messageReplies; //dictionary of this node's replies to incoming messages
+    volatile HashMap<UUID, String> messageReplies; //dictionary of this node's replies to incoming messages
 
     public RaftNode(int id, int port, HashMap<Integer, RemoteNode> remoteNodes) {
         this.id = id;
@@ -110,12 +110,6 @@ public class RaftNode {
             if (remoteNode.equals(id)) continue;
             sendRequestVote(remoteNode);
         }
-        // If the RPC succeeds, some time has passed, we have to check the state to see what our options are.
-        // If our state is no longer candidate, bail out.
-        // If we're still a candidate when the reply is back, we check the term of the reply and compare it
-        // to the original term we were on when we sent the request.
-        // If the reply's term is higher, we revert to a follower state.
-        // This can happen if another candidate won an election while we were collecting votes
     }
 
     private void becomeLeader() {
@@ -176,25 +170,28 @@ public class RaftNode {
         client.start();
     }
 
-    private boolean receiveAppendEntries(String payload) {
+    private String receiveAppendEntries(String payload) {
         JsonObject jsonObject = new JsonParser().parse(payload).getAsJsonObject();
-        boolean addedEntries;
+        JsonObject response = new JsonObject();
 
         if (jsonObject.get(LEADER_TERM).getAsInt() < term) {
             System.out.println("MAIN THREAD: append_entries: had old term");
-            addedEntries = false;
+            response.addProperty("result", false);
+            response.addProperty("reason", "old_term");
         }
         //checks if we have a log entry at prevLogIndex (from Leader)
         else if (jsonObject.get(PREV_LOG_INDEX).getAsInt() > logs.size() - 1) {
             System.out.println("MAIN THREAD: append_entries: have no log entry at prev index");
-            addedEntries = false;
+            response.addProperty("result", false);
+            response.addProperty("reason", "log_inconsistency");
         }
         //checks if the log entry at prevLogIndex (from Leader) has a matching term
         else if (logs.get(jsonObject.get(PREV_LOG_INDEX).getAsInt()).getTerm()
                     != jsonObject.get(PREV_LOG_TERM).getAsInt()
         ) {
             System.out.println("MAIN THREAD: append_entries: mismatch term at prev index");
-            addedEntries = false;
+            response.addProperty("result", false);
+            response.addProperty("reason", "log_inconsistency");
         }
         else {
             Gson gson = new Gson();
@@ -210,21 +207,19 @@ public class RaftNode {
             if (jsonObject.get(LEADER_COMMIT).getAsInt() > commitIndex) {
                 commitIndex = Math.min(jsonObject.get(LEADER_COMMIT).getAsInt(), logs.size() - 1);
             }
-            addedEntries = true;
+
+            response.addProperty("result", true);
+            response.addProperty("newNextIndex", logs.size());
         }
 
-        return addedEntries;
+        return response.getAsString();
     }
 
     public void decrementNextIndex(int destination) {
         nextIndex[destination]--;
     }
 
-    //TODO
-    /*
-    public void increaseNextIndex(int destination, ) {
-
-    }*/
+    public void increaseNextIndex(int destination, int newNextIndex) { nextIndex[destination] = newNextIndex; }
 
     //TODO: implement sendRequestVote
     private void sendRequestVote(int dest) {
@@ -248,32 +243,39 @@ public class RaftNode {
         client.start();
     }
 
-    //TODO: implement receiveRequestVote
-    private boolean receiveRequestVote(String payload) {
-        boolean grantedVote = false;
+    private String receiveRequestVote(String payload) {
+        JsonObject response = new JsonObject();
         System.out.println("Request Vote: " + "term: " + term + "votedFor: " + votedFor);
+
         JsonObject jsonObject = new JsonParser().parse(payload).getAsJsonObject();
         // if the sending node's term is higher than my term
         if (jsonObject.get(CANDIDATE_TERM).getAsInt() >= this.term
                 && (votedFor == null || votedFor == jsonObject.get(CANDIDATE_ID).getAsInt() )) {
-            grantedVote = true;
+            response.addProperty("result", true);
             votedFor = jsonObject.get(CANDIDATE_ID).getAsInt();
         }
+        else {
+            response.addProperty("result", false);
+        }
 
-        return grantedVote;
+        return response.getAsString();
     }
 
-    private boolean receiveCommand(String payload) {
+    private String receiveCommand(String payload) {
+        JsonObject response = new JsonObject();
+
         if (!state.equals(LEADER)) {
             System.out.println(Colors.ANSI_RED + "MAIN THREAD: not the leader but tried to process a command" + Colors.ANSI_RESET);
-            return false;
+            response.addProperty("result", false);
         }
         else {
             JsonObject jsonObject = new JsonParser().parse(payload).getAsJsonObject();
             ReplicatedLog newLog = new ReplicatedLog(term, "dummy command");
             logs.add(newLog);
-            return true;
+            response.addProperty("result", true);
         }
+
+        return response.getAsString();
     }
 
     public synchronized void receiveMessage(Message message) {
@@ -299,12 +301,12 @@ public class RaftNode {
         messageQueue.add(message);
     }
 
-    public HashMap<UUID, Boolean> getMessageReplies() {
+    public HashMap<UUID, String> getMessageReplies() {
         return messageReplies;
     }
 
     private synchronized void processMessage() {
-        boolean retVal;
+        String retVal;
         Gson gson = new Gson();
 
         Message curMessage = messageQueue.poll();

@@ -17,13 +17,11 @@ public class RaftNode {
     private HashMap<Integer, RemoteNode> remoteNodes;
 
     private ArrayList<ReplicatedLog> logs;
-    private int[] matchIndex;
-    private int commitIndex;
     private int lastApplied;
 
-    volatile private int[] nextIndex;
+    volatile private int[] nextIndex, matchIndex;
     volatile private ElectionTimer timer;
-    volatile private Integer voteCount, votedFor, term, currentLeader;
+    volatile private Integer voteCount, votedFor, term, commitIndex, currentLeader;
     volatile private String state;
 
     volatile Queue<Message> messageQueue; //queue of incoming messages to process
@@ -43,6 +41,7 @@ public class RaftNode {
         timer = new ElectionTimer();
         logs = new ArrayList<>();
         nextIndex = new int[remoteNodes.size()];
+        matchIndex = new int[remoteNodes.size()];
         commitIndex = -1;
     }
 
@@ -86,6 +85,7 @@ public class RaftNode {
                 processMessage();
             }
 
+            if (state.equals(LEADER)) commitIndex = findNewCommitIndex();
             if (timer.isExpired() && !state.equals(LEADER)) startElection();
         }
     }
@@ -122,6 +122,7 @@ public class RaftNode {
 
             System.out.println("MAIN THREAD: became the leader!!");
             Arrays.fill(nextIndex, logs.size()); //re-initialize next index array
+            Arrays.fill(matchIndex, -1); //re-initialize matchIndex array
             //TODO: we could send an empty AppendEntries instead of a heartbeat
             sendHeartbeat();
         }
@@ -135,6 +136,31 @@ public class RaftNode {
             if (remoteNode.equals(id)) continue;
             sendAppendEntries(remoteNode);
         }
+    }
+
+    private int findNewCommitIndex() {
+        HashMap<Integer, Integer> commitStates = new HashMap<>();
+
+        //for each node's matchIndex value, track how many other nodes have a value
+        //at least that large
+        for (int i = 0; i < matchIndex.length; i++) {
+            if (!commitStates.containsKey(matchIndex[i])) commitStates.put(matchIndex[i], 0);
+
+            for (Integer curState : commitStates.keySet()) {
+                if (matchIndex[i] >= curState) {
+                    commitStates.put(curState, commitStates.get(curState) + 1);
+                }
+            }
+        }
+
+        //find the maximum commitState (same as a matchIndex value) where a majority of nodes
+        //have a commitState that big
+        int max = -1;
+        for (Integer curState : commitStates.keySet()) {
+            if (curState > max && commitStates.get(curState) >= MAJORITY) max = curState;
+        }
+
+        return max;
     }
 
     private void sendAppendEntries(int dest) {
@@ -230,7 +256,10 @@ public class RaftNode {
         nextIndex[destination]--;
     }
 
-    public synchronized void increaseNextIndex(int destination, int newNextIndex) { nextIndex[destination] = newNextIndex; }
+    public synchronized void increaseNextIndex(int destination, int newNextIndex) {
+        nextIndex[destination] = newNextIndex;
+        matchIndex[destination] = newNextIndex - 1;
+    }
 
     private void sendRequestVote(int dest) {
         HashMap<String, Object> voteInfo = new HashMap<>();
@@ -261,7 +290,7 @@ public class RaftNode {
     private String receiveRequestVote(String payload) {
         JsonObject response = new JsonObject();
         System.out.println("Request Vote: " + "term: " + term + "votedFor: " + votedFor);
-        
+
         JsonObject jsonObject = new JsonParser().parse(payload).getAsJsonObject();
         //if the sending node's term is at least as high as my term
         //and either I haven't voted yet, or I already voted for this node,

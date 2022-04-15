@@ -1,4 +1,4 @@
->initialize nextIndex[]
->have different append entries response from "old term" vs "no match"
 >properly setting commit index
 >tracking matchindex
+
+>clean up debug messaging

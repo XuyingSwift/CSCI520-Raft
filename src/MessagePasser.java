@@ -43,11 +43,11 @@ public class MessagePasser extends Thread{
 
             }
 
-            Boolean result = node.getMessageReplies().get(message.getGuid());
+            String response = node.getMessageReplies().get(message.getGuid());
             node.getMessageReplies().remove(message.getGuid());
-            System.out.println("MSG PASSER THREAD: Got response for " + message.getGuid() + " from " + message.getSender() + ": " + result);
+            System.out.println("MSG PASSER THREAD: Got response for " + message.getGuid() + " from " + message.getSender() + ": " + response);
 
-            socketOut.println(result ? SUCCESS : FAIL);
+            socketOut.println(response);
             socketOut.flush();
 
             socketIn.close();

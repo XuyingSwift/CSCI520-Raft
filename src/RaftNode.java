@@ -1,6 +1,5 @@
-import com.google.gson.Gson;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
+import com.google.gson.*;
+import com.google.gson.reflect.TypeToken;
 
 import java.util.*;
 
@@ -25,17 +24,17 @@ public class RaftNode {
     private HashMap<Integer, RemoteNode> remoteNodes;
 
     private ArrayList<ReplicatedLog> logs;
-    private int[] nextIndex;
     private int[] matchIndex;
     private int commitIndex;
     private int lastApplied;
 
+    volatile private int[] nextIndex;
     volatile private ElectionTimer timer;
     volatile private Integer voteCount, votedFor, term, currentLeader;
     volatile private String state;
 
     volatile Queue<Message> messageQueue; //queue of incoming messages to process
-    volatile HashMap<UUID, Boolean> messageReplies; //dictionary of this node's replies to incoming messages
+    volatile HashMap<UUID, String> messageReplies; //dictionary of this node's replies to incoming messages
 
     public RaftNode(int id, int port, HashMap<Integer, RemoteNode> remoteNodes) {
         this.id = id;
@@ -69,6 +68,7 @@ public class RaftNode {
         timer.start();
         long lastHeartbeat = System.nanoTime();
 
+        int counter = 0; //FOR TESTING ONLY
         while (true) {
             if (state.equals(CANDID) && voteCount >= MAJORITY) {
                 becomeLeader();
@@ -77,6 +77,16 @@ public class RaftNode {
             if (state.equals(LEADER) && ((System.nanoTime() - lastHeartbeat) / 1000000) >= HEARTBEAT_TIME) {
                 sendHeartbeat();
                 lastHeartbeat = System.nanoTime();
+
+                //TESTING BLOCK
+                //add an entry to the log on an average of 1 out of every 10 heartbeats
+                Random rand = new Random();
+                counter++;
+                if (rand.nextInt(10) == 4) {
+                    logs.add(new ReplicatedLog(term, "command #" + id + "-" + counter));
+                    System.out.println(Colors.ANSI_YELLOW + "Added " + "command #" + id + "-" + counter + " to log");
+                }
+                //END TESTING BLOCK
             }
 
             while (!messageQueue.isEmpty()) {
@@ -110,12 +120,6 @@ public class RaftNode {
             if (remoteNode.equals(id)) continue;
             sendRequestVote(remoteNode);
         }
-        // If the RPC succeeds, some time has passed, we have to check the state to see what our options are.
-        // If our state is no longer candidate, bail out.
-        // If we're still a candidate when the reply is back, we check the term of the reply and compare it
-        // to the original term we were on when we sent the request.
-        // If the reply's term is higher, we revert to a follower state.
-        // This can happen if another candidate won an election while we were collecting votes
     }
 
     private void becomeLeader() {
@@ -124,6 +128,7 @@ public class RaftNode {
             currentLeader = id;
 
             System.out.println("MAIN THREAD: became the leader!!");
+            Arrays.fill(nextIndex, logs.size()); //re-initialize next index array
             //TODO: we could send an empty AppendEntries instead of a heartbeat
             sendHeartbeat();
         }
@@ -139,17 +144,16 @@ public class RaftNode {
         }
     }
 
-    // TODO: finish this method
     private void sendAppendEntries(int dest) {
         // send the log and leaderId, prelogindex
-        Gson gson = new Gson();
+        Gson gson = new GsonBuilder().serializeNulls().create();
         HashMap<String, Object> logInfo = new HashMap<>();
         logInfo.put(LEADER_TERM, term);
         logInfo.put(LEADER_ID, id);
         logInfo.put(PREV_LOG_INDEX, nextIndex[dest] - 1);
 
         if (nextIndex[dest] > 0) {
-            logInfo.put(PREV_LOG_TERM, logs.get(nextIndex[dest] - 1));
+            logInfo.put(PREV_LOG_TERM, logs.get(nextIndex[dest] - 1).getTerm());
         }
         else {
             logInfo.put(PREV_LOG_TERM, null);
@@ -158,8 +162,8 @@ public class RaftNode {
         logInfo.put(LEADER_COMMIT, commitIndex);
 
         //if logs last index is greater than or equal to nextIndex for the destination node
-        if (logs.size() - 1 >= nextIndex[dest]) {//send everything from nextIndex[dest] to the end of the log
-            ArrayList<ReplicatedLog> entriesToSend = (ArrayList<ReplicatedLog>) logs.subList(nextIndex[dest], logs.size() - 1);
+        if (logs.size() > nextIndex[dest]) {//send everything from nextIndex[dest] to the end of the log
+            List<ReplicatedLog> entriesToSend = logs.subList(nextIndex[dest], logs.size());
             logInfo.put(ENTRIES, gson.toJson(entriesToSend));
         }
         else {
@@ -172,36 +176,47 @@ public class RaftNode {
         Client client = new Client(remoteNodes.get(dest).getAddress(),
                 remoteNodes.get(dest).getPort(), message, this);
 
-        System.out.println("MAIN THREAD: Starting append entries message to node " + logInfo.get("DestinationNode") + ": " + message.getGuid());
+        System.out.println(gson.toJson(logInfo));
+        System.out.println("MAIN THREAD: Starting append entries message to node " + dest + ": " + message.getGuid());
         client.start();
     }
 
-    private boolean receiveAppendEntries(String payload) {
+    private String receiveAppendEntries(String payload) {
         JsonObject jsonObject = new JsonParser().parse(payload).getAsJsonObject();
-        boolean addedEntries;
+        JsonObject response = new JsonObject();
 
         if (jsonObject.get(LEADER_TERM).getAsInt() < term) {
             System.out.println("MAIN THREAD: append_entries: had old term");
-            addedEntries = false;
+            response.addProperty("result", false);
+            response.addProperty("reason", "old_term");
+        }
+        //checks if the log is still empty
+        else if (jsonObject.get(ENTRIES).isJsonNull()) {
+            System.out.println("MAIN THREAD: append_entries: new entries is empty");
+            response.addProperty("result", false);
+            response.addProperty("reason", "empty_log");
         }
         //checks if we have a log entry at prevLogIndex (from Leader)
         else if (jsonObject.get(PREV_LOG_INDEX).getAsInt() > logs.size() - 1) {
             System.out.println("MAIN THREAD: append_entries: have no log entry at prev index");
-            addedEntries = false;
+            response.addProperty("result", false);
+            response.addProperty("reason", "log_inconsistency");
         }
         //checks if the log entry at prevLogIndex (from Leader) has a matching term
-        else if (logs.get(jsonObject.get(PREV_LOG_INDEX).getAsInt()).getTerm()
-                    != jsonObject.get(PREV_LOG_TERM).getAsInt()
+        else if (jsonObject.get(PREV_LOG_INDEX).getAsInt() >= 0 &&
+                logs.get(jsonObject.get(PREV_LOG_INDEX).getAsInt()).getTerm() != jsonObject.get(PREV_LOG_TERM).getAsInt()
         ) {
             System.out.println("MAIN THREAD: append_entries: mismatch term at prev index");
-            addedEntries = false;
+            response.addProperty("result", false);
+            response.addProperty("reason", "log_inconsistency");
         }
         else {
+            TypeToken<List<ReplicatedLog>> token = new TypeToken<>() {};
             Gson gson = new Gson();
-            ArrayList<ReplicatedLog> newEntries = gson.fromJson(jsonObject.get(ENTRIES).getAsString(), ArrayList.class);
+            ArrayList<ReplicatedLog> newEntries = gson.fromJson(jsonObject.get(ENTRIES).getAsString(), token.getType());
 
             System.out.println("MAIN THREAD: append_entries: adding log entries " + jsonObject.get(ENTRIES).getAsString());
-            int index = jsonObject.get(PREV_LOG_INDEX).getAsInt();
+            int index = jsonObject.get(PREV_LOG_INDEX).getAsInt() + 1;
             for (ReplicatedLog curEntry : newEntries) {
                 logs.add(index, curEntry);
                 index++;
@@ -210,21 +225,19 @@ public class RaftNode {
             if (jsonObject.get(LEADER_COMMIT).getAsInt() > commitIndex) {
                 commitIndex = Math.min(jsonObject.get(LEADER_COMMIT).getAsInt(), logs.size() - 1);
             }
-            addedEntries = true;
+
+            response.addProperty("result", true);
+            response.addProperty("newNextIndex", logs.size());
         }
 
-        return addedEntries;
+        return response.toString();
     }
 
-    public void decrementNextIndex(int destination) {
+    public synchronized void decrementNextIndex(int destination) {
         nextIndex[destination]--;
     }
 
-    //TODO
-    /*
-    public void increaseNextIndex(int destination, ) {
-
-    }*/
+    public synchronized void increaseNextIndex(int destination, int newNextIndex) { nextIndex[destination] = newNextIndex; }
 
     //TODO: implement sendRequestVote
     private void sendRequestVote(int dest) {
@@ -248,32 +261,39 @@ public class RaftNode {
         client.start();
     }
 
-    //TODO: implement receiveRequestVote
-    private boolean receiveRequestVote(String payload) {
-        boolean grantedVote = false;
+    private String receiveRequestVote(String payload) {
+        JsonObject response = new JsonObject();
         System.out.println("Request Vote: " + "term: " + term + "votedFor: " + votedFor);
+
         JsonObject jsonObject = new JsonParser().parse(payload).getAsJsonObject();
         // if the sending node's term is higher than my term
         if (jsonObject.get(CANDIDATE_TERM).getAsInt() >= this.term
                 && (votedFor == null || votedFor == jsonObject.get(CANDIDATE_ID).getAsInt() )) {
-            grantedVote = true;
+            response.addProperty("result", true);
             votedFor = jsonObject.get(CANDIDATE_ID).getAsInt();
         }
+        else {
+            response.addProperty("result", false);
+        }
 
-        return grantedVote;
+        return response.toString();
     }
 
-    private boolean receiveCommand(String payload) {
+    private String receiveCommand(String payload) {
+        JsonObject response = new JsonObject();
+
         if (!state.equals(LEADER)) {
             System.out.println(Colors.ANSI_RED + "MAIN THREAD: not the leader but tried to process a command" + Colors.ANSI_RESET);
-            return false;
+            response.addProperty("result", false);
         }
         else {
             JsonObject jsonObject = new JsonParser().parse(payload).getAsJsonObject();
             ReplicatedLog newLog = new ReplicatedLog(term, "dummy command");
             logs.add(newLog);
-            return true;
+            response.addProperty("result", true);
         }
+
+        return response.toString();
     }
 
     public synchronized void receiveMessage(Message message) {
@@ -299,13 +319,12 @@ public class RaftNode {
         messageQueue.add(message);
     }
 
-    public HashMap<UUID, Boolean> getMessageReplies() {
+    public HashMap<UUID, String> getMessageReplies() {
         return messageReplies;
     }
 
     private synchronized void processMessage() {
-        boolean retVal;
-        Gson gson = new Gson();
+        String retVal;
 
         Message curMessage = messageQueue.poll();
         if (curMessage == null) {
@@ -314,8 +333,7 @@ public class RaftNode {
         System.out.println("MAIN THREAD: Processing message " + curMessage.getGuid() + " from node " + curMessage.getSender() + " (" + curMessage.getType() + ")");
 
         if (curMessage.getType().equals(APPEND)) {
-            String payload = gson.fromJson(curMessage.getPayload(), String.class);
-            retVal = receiveAppendEntries(payload);
+            retVal = receiveAppendEntries(curMessage.getPayload());
             messageReplies.put(curMessage.getGuid(), retVal);
         }
         else if (curMessage.getType().equals(REQ_VOTE)) {

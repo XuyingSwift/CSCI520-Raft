@@ -1,7 +1,7 @@
 import java.util.Random;
 
 public class ElectionTimer extends Thread{
-    private int timeout;
+    volatile private int timeout;
     private final int MIN_TIMEOUT = 150 * RaftRunner.SLOW_FACTOR, MAX_TIMEOUT = 300 * RaftRunner.SLOW_FACTOR;
     volatile private boolean expired;
 
@@ -21,11 +21,14 @@ public class ElectionTimer extends Thread{
                 //e.printStackTrace();
             }
 
-            while (expired) {}; //hold here until receiving a "reset" command that set expired back to FALSE
+            //hold here until receiving a "reset" command that set expired back to FALSE
+            while (expired) {
+                Thread.onSpinWait();
+            }
         }
     }
 
-    public void reset() {
+    public synchronized void reset() {
         if (timeout != 0) this.interrupt(); //do not interrupt if called from constructor
         Random rand = new Random();
         timeout = rand.nextInt((MAX_TIMEOUT - MIN_TIMEOUT) + 1) + MIN_TIMEOUT;

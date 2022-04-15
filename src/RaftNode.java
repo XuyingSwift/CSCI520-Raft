@@ -232,7 +232,6 @@ public class RaftNode {
 
     public synchronized void increaseNextIndex(int destination, int newNextIndex) { nextIndex[destination] = newNextIndex; }
 
-    //TODO: implement sendRequestVote
     private void sendRequestVote(int dest) {
         HashMap<String, Object> voteInfo = new HashMap<>();
 
@@ -262,10 +261,7 @@ public class RaftNode {
     private String receiveRequestVote(String payload) {
         JsonObject response = new JsonObject();
         System.out.println("Request Vote: " + "term: " + term + "votedFor: " + votedFor);
-
-        //TODO: lastLogIndex
-        //TODO: lastLogTerm
-
+        
         JsonObject jsonObject = new JsonParser().parse(payload).getAsJsonObject();
         //if the sending node's term is at least as high as my term
         //and either I haven't voted yet, or I already voted for this node,

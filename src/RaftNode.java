@@ -1,6 +1,5 @@
-import com.google.gson.Gson;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
+import com.google.gson.*;
+import com.google.gson.reflect.TypeToken;
 
 import java.util.*;
 
@@ -84,7 +83,8 @@ public class RaftNode {
                 Random rand = new Random();
                 counter++;
                 if (rand.nextInt(10) == 4) {
-                    logs.add(new ReplicatedLog(term, "command #" + counter));
+                    logs.add(new ReplicatedLog(term, "command #" + id + "-" + counter));
+                    System.out.println(Colors.ANSI_YELLOW + "Added " + "command #" + id + "-" + counter + " to log");
                 }
                 //END TESTING BLOCK
             }
@@ -146,14 +146,14 @@ public class RaftNode {
 
     private void sendAppendEntries(int dest) {
         // send the log and leaderId, prelogindex
-        Gson gson = new Gson();
+        Gson gson = new GsonBuilder().serializeNulls().create();
         HashMap<String, Object> logInfo = new HashMap<>();
         logInfo.put(LEADER_TERM, term);
         logInfo.put(LEADER_ID, id);
         logInfo.put(PREV_LOG_INDEX, nextIndex[dest] - 1);
 
         if (nextIndex[dest] > 0) {
-            logInfo.put(PREV_LOG_TERM, logs.get(nextIndex[dest] - 1));
+            logInfo.put(PREV_LOG_TERM, logs.get(nextIndex[dest] - 1).getTerm());
         }
         else {
             logInfo.put(PREV_LOG_TERM, null);
@@ -162,8 +162,8 @@ public class RaftNode {
         logInfo.put(LEADER_COMMIT, commitIndex);
 
         //if logs last index is greater than or equal to nextIndex for the destination node
-        if (logs.size() - 1 >= nextIndex[dest]) {//send everything from nextIndex[dest] to the end of the log
-            ArrayList<ReplicatedLog> entriesToSend = (ArrayList<ReplicatedLog>) logs.subList(nextIndex[dest], logs.size() - 1);
+        if (logs.size() > nextIndex[dest]) {//send everything from nextIndex[dest] to the end of the log
+            List<ReplicatedLog> entriesToSend = logs.subList(nextIndex[dest], logs.size());
             logInfo.put(ENTRIES, gson.toJson(entriesToSend));
         }
         else {
@@ -176,7 +176,8 @@ public class RaftNode {
         Client client = new Client(remoteNodes.get(dest).getAddress(),
                 remoteNodes.get(dest).getPort(), message, this);
 
-        System.out.println("MAIN THREAD: Starting append entries message to node " + logInfo.get("DestinationNode") + ": " + message.getGuid());
+        System.out.println(gson.toJson(logInfo));
+        System.out.println("MAIN THREAD: Starting append entries message to node " + dest + ": " + message.getGuid());
         client.start();
     }
 
@@ -189,6 +190,12 @@ public class RaftNode {
             response.addProperty("result", false);
             response.addProperty("reason", "old_term");
         }
+        //checks if the log is still empty
+        else if (jsonObject.get(ENTRIES).isJsonNull()) {
+            System.out.println("MAIN THREAD: append_entries: new entries is empty");
+            response.addProperty("result", false);
+            response.addProperty("reason", "empty_log");
+        }
         //checks if we have a log entry at prevLogIndex (from Leader)
         else if (jsonObject.get(PREV_LOG_INDEX).getAsInt() > logs.size() - 1) {
             System.out.println("MAIN THREAD: append_entries: have no log entry at prev index");
@@ -196,19 +203,20 @@ public class RaftNode {
             response.addProperty("reason", "log_inconsistency");
         }
         //checks if the log entry at prevLogIndex (from Leader) has a matching term
-        else if (logs.get(jsonObject.get(PREV_LOG_INDEX).getAsInt()).getTerm()
-                    != jsonObject.get(PREV_LOG_TERM).getAsInt()
+        else if (jsonObject.get(PREV_LOG_INDEX).getAsInt() >= 0 &&
+                logs.get(jsonObject.get(PREV_LOG_INDEX).getAsInt()).getTerm() != jsonObject.get(PREV_LOG_TERM).getAsInt()
         ) {
             System.out.println("MAIN THREAD: append_entries: mismatch term at prev index");
             response.addProperty("result", false);
             response.addProperty("reason", "log_inconsistency");
         }
         else {
+            TypeToken<List<ReplicatedLog>> token = new TypeToken<>() {};
             Gson gson = new Gson();
-            ArrayList<ReplicatedLog> newEntries = gson.fromJson(jsonObject.get(ENTRIES).getAsString(), ArrayList.class);
+            ArrayList<ReplicatedLog> newEntries = gson.fromJson(jsonObject.get(ENTRIES).getAsString(), token.getType());
 
             System.out.println("MAIN THREAD: append_entries: adding log entries " + jsonObject.get(ENTRIES).getAsString());
-            int index = jsonObject.get(PREV_LOG_INDEX).getAsInt();
+            int index = jsonObject.get(PREV_LOG_INDEX).getAsInt() + 1;
             for (ReplicatedLog curEntry : newEntries) {
                 logs.add(index, curEntry);
                 index++;
@@ -222,7 +230,7 @@ public class RaftNode {
             response.addProperty("newNextIndex", logs.size());
         }
 
-        return response.getAsString();
+        return response.toString();
     }
 
     public synchronized void decrementNextIndex(int destination) {
@@ -268,7 +276,7 @@ public class RaftNode {
             response.addProperty("result", false);
         }
 
-        return response.getAsString();
+        return response.toString();
     }
 
     private String receiveCommand(String payload) {
@@ -285,7 +293,7 @@ public class RaftNode {
             response.addProperty("result", true);
         }
 
-        return response.getAsString();
+        return response.toString();
     }
 
     public synchronized void receiveMessage(Message message) {
@@ -317,7 +325,6 @@ public class RaftNode {
 
     private synchronized void processMessage() {
         String retVal;
-        Gson gson = new Gson();
 
         Message curMessage = messageQueue.poll();
         if (curMessage == null) {
@@ -326,8 +333,7 @@ public class RaftNode {
         System.out.println("MAIN THREAD: Processing message " + curMessage.getGuid() + " from node " + curMessage.getSender() + " (" + curMessage.getType() + ")");
 
         if (curMessage.getType().equals(APPEND)) {
-            String payload = gson.fromJson(curMessage.getPayload(), String.class);
-            retVal = receiveAppendEntries(payload);
+            retVal = receiveAppendEntries(curMessage.getPayload());
             messageReplies.put(curMessage.getGuid(), retVal);
         }
         else if (curMessage.getType().equals(REQ_VOTE)) {

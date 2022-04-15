@@ -77,7 +77,7 @@ public class Client extends Thread{
             JsonObject responseJson = new JsonObject();
             responseJson.addProperty("result", false);
             responseJson.addProperty("reason", "exception");
-            response = responseJson.getAsString();
+            response = responseJson.toString();
             //System.out.println(Colors.ANSI_RESET);
             //e.printStackTrace();
         }

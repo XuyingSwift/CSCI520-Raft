@@ -1,7 +1,4 @@
->initialize nextIndex[]
->have different append entries response from "old term" vs "no match"
 >properly setting commit index
 >tracking matchindex
->review thread safety
+
 >clean up debug messaging
->add script to run w/ command line params

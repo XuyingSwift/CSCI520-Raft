@@ -373,7 +373,7 @@ public class RaftNode {
         messageQueue.add(message);
     }
 
-    public HashMap<UUID, String> getMessageReplies() {
+    public synchronized HashMap<UUID, String> getMessageReplies() {
         return messageReplies;
     }
 

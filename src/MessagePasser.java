@@ -9,7 +9,6 @@ import java.net.Socket;
 public class MessagePasser extends Thread{
     private Socket socket;
     volatile private RaftNode node;
-    public static String SUCCESS = "TRUE", FAIL = "FALSE";
 
     public MessagePasser(Socket socket, RaftNode node) {
         this.socket = socket;

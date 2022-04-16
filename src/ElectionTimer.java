@@ -28,7 +28,7 @@ public class ElectionTimer extends Thread{
         }
     }
 
-    public synchronized void reset() {
+    synchronized public void reset() {
         if (timeout != 0) this.interrupt(); //do not interrupt if called from constructor
         Random rand = new Random();
         timeout = rand.nextInt((MAX_TIMEOUT - MIN_TIMEOUT) + 1) + MIN_TIMEOUT;

@@ -92,7 +92,7 @@ public class RaftNode {
 
     public int getPort() { return port; }
 
-    public synchronized void addVote(int voteTerm) {
+    synchronized public void addVote(int voteTerm) {
         if (voteTerm == this.term) voteCount++;
     }
 
@@ -252,11 +252,11 @@ public class RaftNode {
         return response.toString();
     }
 
-    public synchronized void decrementNextIndex(int destination) {
+    synchronized public void decrementNextIndex(int destination) {
         nextIndex[destination]--;
     }
 
-    public synchronized void increaseNextIndex(int destination, int newNextIndex) {
+    synchronized public void increaseNextIndex(int destination, int newNextIndex) {
         nextIndex[destination] = newNextIndex;
         matchIndex[destination] = newNextIndex - 1;
     }
@@ -350,7 +350,7 @@ public class RaftNode {
         return response.toString();
     }
 
-    public synchronized void receiveMessage(Message message) {
+    synchronized public void receiveMessage(Message message) {
         if (message == null) {
             System.out.println(Colors.ANSI_RED + "WARNING (" + Thread.currentThread().getName() + "): putting NULL message on queue" + Colors.ANSI_RESET);
         }
@@ -377,7 +377,7 @@ public class RaftNode {
         return messageReplies;
     }
 
-    private synchronized void processMessage() {
+    synchronized private void processMessage() {
         String retVal;
 
         Message curMessage = messageQueue.poll();

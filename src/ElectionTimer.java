@@ -11,11 +11,11 @@ public class ElectionTimer extends Thread{
 
     public void run() {
         while (true) {
-            System.out.println(Colors.ANSI_BLUE + ">Timer start: " + timeout + Colors.ANSI_RESET);
+            System.out.println(Colors.ANSI_BLUE + "Timer (" + Thread.currentThread().getName() + "): start " + timeout + Colors.ANSI_RESET);
             try {
-                System.out.println(Colors.ANSI_BLUE + ">Sleeping...." + Colors.ANSI_RESET);
+                System.out.println(Colors.ANSI_BLUE + "Timer (" + Thread.currentThread().getName() + "): sleeping...." + Colors.ANSI_RESET);
                 Thread.sleep(timeout);
-                System.out.println(Colors.ANSI_BLUE + ">Expired...." + Colors.ANSI_RESET);
+                System.out.println(Colors.ANSI_BLUE + "Timer (" + Thread.currentThread().getName() + "): expired" + Colors.ANSI_RESET);
                 expired = true;
             } catch (InterruptedException e) {
                 //e.printStackTrace();
@@ -28,11 +28,11 @@ public class ElectionTimer extends Thread{
         }
     }
 
-    public synchronized void reset() {
+    synchronized public void reset() {
         if (timeout != 0) this.interrupt(); //do not interrupt if called from constructor
         Random rand = new Random();
         timeout = rand.nextInt((MAX_TIMEOUT - MIN_TIMEOUT) + 1) + MIN_TIMEOUT;
-        System.out.println(Colors.ANSI_BLUE + ">TIMER RESET " + timeout + Colors.ANSI_RESET);
+        System.out.println(Colors.ANSI_BLUE + ">>>Timer (" + Thread.currentThread().getName() + "): reset to " + timeout + Colors.ANSI_RESET);
         expired = false;
     }
 

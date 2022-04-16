@@ -1,4 +1,6 @@
->properly setting commit index
->tracking matchindex
+>write log to disk
+>read log from disk on startup
 
->clean up debug messaging
+>test with 5 nodes
+>test with shorter timing
+>deploy on AWS

@@ -8,10 +8,10 @@ import java.io.PrintStream;
 import java.net.Socket;
 
 public class Client extends Thread{
-    String address;
-    int port;
-    Message message;
-    RaftNode node;
+    private String address;
+    private int port;
+    private Message message;
+    private volatile RaftNode node;
 
     public Client(String address, int port, Message message, RaftNode node) {
         this.address = address;
@@ -22,7 +22,7 @@ public class Client extends Thread{
 
     public void run() {
         String response = sendMessage();
-        System.out.println("CLIENT THREAD: Message " + message.getGuid() + " to " + message.getDestination() + ": " + response);
+        System.out.println(Colors.ANSI_GREEN + "Client (" + Thread.currentThread().getName() + "): " + message.getType() + " message [" + message.getGuid() + "] to " + message.getDestination() + " response: " + response + Colors.ANSI_RESET);
 
         Gson gson = new Gson();
         JsonObject responseJson = gson.fromJson(response, JsonObject.class);
@@ -44,14 +44,10 @@ public class Client extends Thread{
     }
 
     private String sendMessage() {
-        System.out.println(Colors.ANSI_PURPLE + "*");
-        System.out.println("* Sending message to " + address + ":" + port);
-
         String response = null;
         try {
             Socket socket = new Socket(address, port);
-            System.out.println("* Connection made");
-            System.out.println("*" + Colors.ANSI_RESET);
+            System.out.println(Colors.ANSI_GREEN + "Client (" + Thread.currentThread().getName() + "): Connection made to " + address + ":" + port + Colors.ANSI_RESET);
 
             PrintStream socketOut = new PrintStream(socket.getOutputStream());
             BufferedReader socketIn = new BufferedReader(new InputStreamReader(socket.getInputStream()));
@@ -73,7 +69,7 @@ public class Client extends Thread{
             socketOut.close();
             socket.close();
         } catch (IOException e) {
-            System.out.println(Colors.ANSI_RED + "WARNING: Could not communicate with node " + message.getDestination() + Colors.ANSI_RESET);
+            System.out.println(Colors.ANSI_RED + "WARNING Client (" + Thread.currentThread().getName() + "): Communication failed with node " + message.getDestination() + Colors.ANSI_RESET);
             JsonObject responseJson = new JsonObject();
             responseJson.addProperty("result", false);
             responseJson.addProperty("reason", "exception");

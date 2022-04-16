@@ -5,7 +5,7 @@ import java.net.Socket;
 public class Server extends Thread {
     private ServerSocket server;
     private boolean running;
-    private RaftNode node;
+    volatile private RaftNode node;
 
     public Server(RaftNode node) {
         try {
@@ -37,8 +37,7 @@ public class Server extends Thread {
                 MessagePasser passer = new MessagePasser(socket, node);
                 passer.start();
             } catch (IOException ioException) {
-                System.out.println(Colors.ANSI_PURPLE + "* ");
-                System.out.println("* Closing server socket..." + Colors.ANSI_RESET);
+                System.out.println(Colors.ANSI_PURPLE + "* Closing server socket..." + Colors.ANSI_RESET);
             }
         }
     }

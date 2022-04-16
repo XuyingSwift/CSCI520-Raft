@@ -85,7 +85,17 @@ public class RaftNode {
                 processMessage();
             }
 
-            if (state.equals(LEADER)) commitIndex = findNewCommitIndex();
+            if (state.equals(LEADER)) {
+                int newCommitIndex = findNewCommitIndex();
+                if (newCommitIndex > commitIndex) {
+                    commitIndex = newCommitIndex;
+                    System.out.println(Colors.ANSI_YELLOW + "Updated commit index to " + newCommitIndex + Colors.ANSI_RESET);
+                }
+                else if (newCommitIndex < commitIndex) {
+                    System.out.println(Colors.ANSI_RED + "WARNING: found a smaller commit index of " + newCommitIndex + Colors.ANSI_RESET);
+                }
+            }
+
             if (timer.isExpired() && !state.equals(LEADER)) startElection();
         }
     }

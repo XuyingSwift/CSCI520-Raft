@@ -71,12 +71,12 @@ public class RaftNode {
                 lastHeartbeat = System.nanoTime();
 
                 //TESTING BLOCK
-                //add an entry to the log on an average of 1 out of every 10 heartbeats
+                //add an entry to the log on an average of 1 out of every 7 heartbeats
                 Random rand = new Random();
                 counter++;
-                if (rand.nextInt(10) == 4) {
+                if (rand.nextInt(7) == 4) {
                     logs.add(new ReplicatedLog(term, "command #" + id + "-" + counter));
-                    System.out.println(Colors.ANSI_YELLOW + "Added " + "command #" + id + "-" + counter + " to log");
+                    System.out.println(Colors.ANSI_YELLOW + "RaftNode (" + Thread.currentThread().getName() + "): Added " + "command #" + id + "-" + counter + " to log" + Colors.ANSI_RESET);
                 }
                 //END TESTING BLOCK
             }
@@ -89,10 +89,10 @@ public class RaftNode {
                 int newCommitIndex = findNewCommitIndex();
                 if (newCommitIndex > commitIndex) {
                     commitIndex = newCommitIndex;
-                    System.out.println(Colors.ANSI_YELLOW + "Updated commit index to " + newCommitIndex + Colors.ANSI_RESET);
+                    System.out.println(Colors.ANSI_YELLOW + "RaftNode (" + Thread.currentThread().getName() + "): Updated commit index to " + newCommitIndex + Colors.ANSI_RESET);
                 }
                 else if (newCommitIndex < commitIndex) {
-                    System.out.println(Colors.ANSI_RED + "WARNING: found a smaller commit index of " + newCommitIndex + Colors.ANSI_RESET);
+                    System.out.println(Colors.ANSI_RED + "WARNING RaftNode (" + Thread.currentThread().getName() + "): found a smaller commit index of " + newCommitIndex + Colors.ANSI_RESET);
                 }
             }
 
@@ -130,14 +130,14 @@ public class RaftNode {
             state = LEADER;
             currentLeader = id;
 
-            System.out.println("MAIN THREAD: became the leader!!");
+            System.out.println(Colors.ANSI_YELLOW + "RaftNode (" + Thread.currentThread().getName() + "): became the leader!!" + Colors.ANSI_RESET);
             Arrays.fill(nextIndex, logs.size()); //re-initialize next index array
             Arrays.fill(matchIndex, -1); //re-initialize matchIndex array
             //TODO: we could send an empty AppendEntries instead of a heartbeat
             sendHeartbeat();
         }
         else {
-            System.out.println("MAIN THREAD: was trying to become leader but found a new leader");
+            System.out.println(Colors.ANSI_CYAN + "RaftNode (" + Thread.currentThread().getName() + "): was trying to become leader but found a new leader" + Colors.ANSI_RESET);
         }
     }
 
@@ -204,9 +204,9 @@ public class RaftNode {
         Message message = new Message(id, dest, term, APPEND, payload);
         Client client = new Client(remoteNodes.get(dest).getAddress(),
                 remoteNodes.get(dest).getPort(), message, this);
-
-        System.out.println(gson.toJson(logInfo));
-        System.out.println("MAIN THREAD: Starting append entries message to node " + dest + ": " + message.getGuid());
+        
+        System.out.println(Colors.ANSI_CYAN + "RaftNode (" + Thread.currentThread().getName() + "): Sending append entries message [" + message.getGuid() + "] to node " + dest + Colors.ANSI_RESET);
+        System.out.println(Colors.ANSI_CYAN + "     " + message.getPayload() + Colors.ANSI_RESET);
         client.start();
     }
 
@@ -214,20 +214,17 @@ public class RaftNode {
         JsonObject jsonObject = new JsonParser().parse(payload).getAsJsonObject();
         JsonObject response = new JsonObject();
 
-        if (jsonObject.get(LEADER_TERM).getAsInt() < term) {
-            System.out.println("MAIN THREAD: append_entries: had old term");
+        if (jsonObject.get(LEADER_TERM).getAsInt() < term) {            
             response.addProperty("result", false);
             response.addProperty("reason", "old_term");
         }
         //checks if the log is still empty
         else if (jsonObject.get(ENTRIES).isJsonNull()) {
-            System.out.println("MAIN THREAD: append_entries: new entries is empty");
             response.addProperty("result", false);
             response.addProperty("reason", "empty_log");
         }
         //checks if we have a log entry at prevLogIndex (from Leader)
         else if (jsonObject.get(PREV_LOG_INDEX).getAsInt() > logs.size() - 1) {
-            System.out.println("MAIN THREAD: append_entries: have no log entry at prev index");
             response.addProperty("result", false);
             response.addProperty("reason", "log_inconsistency");
         }
@@ -235,7 +232,6 @@ public class RaftNode {
         else if (jsonObject.get(PREV_LOG_INDEX).getAsInt() >= 0 &&
                 logs.get(jsonObject.get(PREV_LOG_INDEX).getAsInt()).getTerm() != jsonObject.get(PREV_LOG_TERM).getAsInt()
         ) {
-            System.out.println("MAIN THREAD: append_entries: mismatch term at prev index");
             response.addProperty("result", false);
             response.addProperty("reason", "log_inconsistency");
         }
@@ -244,7 +240,7 @@ public class RaftNode {
             Gson gson = new Gson();
             ArrayList<ReplicatedLog> newEntries = gson.fromJson(jsonObject.get(ENTRIES).getAsString(), token.getType());
 
-            System.out.println("MAIN THREAD: append_entries: adding log entries " + jsonObject.get(ENTRIES).getAsString());
+            System.out.println(Colors.ANSI_CYAN + "RaftNode (" + Thread.currentThread().getName() + "): adding log entries " + jsonObject.get(ENTRIES).getAsString() + Colors.ANSI_RESET);
             int index = jsonObject.get(PREV_LOG_INDEX).getAsInt() + 1;
 
             //remove all old entries
@@ -297,15 +293,15 @@ public class RaftNode {
         Message message = new Message(id, dest, term, REQ_VOTE, payload);
         Client client = new Client(remoteNodes.get(dest).getAddress(), remoteNodes.get(dest).getPort(), message, this);
 
-        System.out.println("MAIN THREAD: Starting request vote message to node " + dest + ": " + message.getGuid());
+        System.out.println(Colors.ANSI_CYAN + "RaftNode (" + Thread.currentThread().getName() + "): Sending request vote message [" + message.getGuid() + "] to node " + dest + Colors.ANSI_RESET);
+        System.out.println(Colors.ANSI_CYAN + "     " + message.getPayload() + Colors.ANSI_RESET);
         client.start();
     }
 
     private String receiveRequestVote(String payload) {
         JsonObject response = new JsonObject();
-        System.out.println("Request Vote: " + "term: " + term + "votedFor: " + votedFor);
-
         JsonObject jsonObject = new JsonParser().parse(payload).getAsJsonObject();
+        
         //if the sending node's term is at least as high as my term
         //and either I haven't voted yet, or I already voted for this node,
         //maybe grant vote
@@ -351,7 +347,7 @@ public class RaftNode {
         JsonObject response = new JsonObject();
 
         if (!state.equals(LEADER)) {
-            System.out.println(Colors.ANSI_RED + "MAIN THREAD: not the leader but tried to process a command" + Colors.ANSI_RESET);
+            System.out.println(Colors.ANSI_RED + "WARNING RaftNode (" + Thread.currentThread().getName() + "): not the leader but tried to process a command" + Colors.ANSI_RESET);
             response.addProperty("result", false);
         }
         else {
@@ -366,7 +362,7 @@ public class RaftNode {
 
     synchronized public void receiveMessage(Message message) {
         if (message == null) {
-            System.out.println(Colors.ANSI_RED + "WARNING (" + Thread.currentThread().getName() + "): putting NULL message on queue" + Colors.ANSI_RESET);
+            System.out.println(Colors.ANSI_RED + ">>>WARNING RaftNode (" + Thread.currentThread().getName() + "): putting NULL message on queue" + Colors.ANSI_RESET);
         }
 
         if (message.getType().equals(REQ_VOTE) && (message.getTerm() > term || (message.getTerm() >= term && votedFor.equals(message.getSender())))) {
@@ -396,24 +392,27 @@ public class RaftNode {
 
         Message curMessage = messageQueue.poll();
         if (curMessage == null) {
-            System.out.println("MAIN THREAD: Pulled NULL message off of queue");
+            System.out.println(Colors.ANSI_RED + "WARNING RaftNode (" + Thread.currentThread().getName() + "): Pulled NULL message off of queue" + Colors.ANSI_RESET);
         }
-        System.out.println("MAIN THREAD: Processing message " + curMessage.getGuid() + " from node " + curMessage.getSender() + " (" + curMessage.getType() + ")");
+        System.out.println(Colors.ANSI_CYAN + "RaftNode (" + Thread.currentThread().getName() + "): Processing " + curMessage.getType() + " message [" + curMessage.getGuid() + "] from node " + curMessage.getSender() + Colors.ANSI_RESET);
 
         if (curMessage.getType().equals(APPEND)) {
             retVal = receiveAppendEntries(curMessage.getPayload());
+            System.out.println(Colors.ANSI_CYAN + "RaftNode (" + Thread.currentThread().getName() + "): message [" + curMessage.getGuid() + "] response: " + retVal + Colors.ANSI_RESET);
             messageReplies.put(curMessage.getGuid(), retVal);
         }
         else if (curMessage.getType().equals(REQ_VOTE)) {
             retVal = receiveRequestVote(curMessage.getPayload());
+            System.out.println(Colors.ANSI_CYAN + "RaftNode (" + Thread.currentThread().getName() + "): message [" + curMessage.getGuid() + "] response: " + retVal + Colors.ANSI_RESET);
             messageReplies.put(curMessage.getGuid(), retVal);
         }
         else if (curMessage.getType().equals(COMMAND)) {
             retVal = receiveCommand(curMessage.getPayload());
+            System.out.println(Colors.ANSI_CYAN + "RaftNode (" + Thread.currentThread().getName() + "): message [" + curMessage.getGuid() + "] response: " + retVal + Colors.ANSI_RESET);
             messageReplies.put(curMessage.getGuid(), retVal);
         }
         else {
-            System.out.println(Colors.ANSI_RED + "***ERROR: UNSUPPORTED MESSAGE TYPE " + curMessage.getType() + "***" + Colors.ANSI_RESET);
+            System.out.println(Colors.ANSI_RED + "ERROR RaftNode (" + Thread.currentThread().getName() + "): UNSUPPORTED MESSAGE TYPE " + curMessage.getType() + Colors.ANSI_RESET);
         }
     }
 }

@@ -16,8 +16,7 @@ public class MessagePasser extends Thread{
     }
 
     public void run() {
-        System.out.println(Colors.ANSI_PURPLE + System.lineSeparator() + "*");
-        System.out.println("* Another node connected..." + Colors.ANSI_RESET);
+        System.out.println(Colors.ANSI_PURPLE + "* Another node connected..." + Colors.ANSI_RESET);
 
         try {
             PrintStream socketOut = new PrintStream(socket.getOutputStream());
@@ -37,14 +36,14 @@ public class MessagePasser extends Thread{
             Message message = gson.fromJson(messageJson, Message.class);
             node.receiveMessage(message);
 
-            System.out.println("MSG PASSER THREAD: Added message " + message.getGuid() + " from " + message.getSender() + " to queue, waiting for response...");
+            System.out.println(Colors.ANSI_PURPLE + "MessagePasser (" + Thread.currentThread().getName() + "): Added " + message.getType() + " message [" + message.getGuid() + "] from " + message.getSender() + " to queue, waiting for response..." + Colors.ANSI_RESET);
             while (!node.getMessageReplies().containsKey(message.getGuid())) {
 
             }
 
             String response = node.getMessageReplies().get(message.getGuid());
             node.getMessageReplies().remove(message.getGuid());
-            System.out.println("MSG PASSER THREAD: Got response for " + message.getGuid() + " from " + message.getSender() + ": " + response);
+            System.out.println(Colors.ANSI_PURPLE + "MessagePasser (" + Thread.currentThread().getName() + "): " + message.getType() + " message [" + message.getGuid() + "] from " + message.getSender() + " was processed, response: " + response + Colors.ANSI_RESET);
 
             socketOut.println(response);
             socketOut.flush();
@@ -53,7 +52,8 @@ public class MessagePasser extends Thread{
             socketOut.close();
             socket.close();
         } catch (IOException e) {
-            e.printStackTrace();
+            System.out.println(Colors.ANSI_RED + "WARNING MessagePasser (" + Thread.currentThread().getName() + "): Communication failed" + Colors.ANSI_RESET);
+            //e.printStackTrace();
         }
     }
 }

@@ -26,10 +26,7 @@ public class RaftRunner {
         //start a thread to listen for messages on the port
         Server server = new Server(node);
         server.start();
-
-        System.out.println(Colors.ANSI_PURPLE + "* ");
-        System.out.println("* Started server on port " + node.getPort() + " to listen for messages");
-        System.out.println("*" + Colors.ANSI_RESET);
+        System.out.println(Colors.ANSI_PURPLE + "* Started server on port " + node.getPort() + " to listen for messages" + Colors.ANSI_RESET);
 
         node.run();
 

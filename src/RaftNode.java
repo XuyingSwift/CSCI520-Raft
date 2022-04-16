@@ -246,6 +246,10 @@ public class RaftNode {
 
             System.out.println("MAIN THREAD: append_entries: adding log entries " + jsonObject.get(ENTRIES).getAsString());
             int index = jsonObject.get(PREV_LOG_INDEX).getAsInt() + 1;
+
+            //remove all old entries
+            for (int j = index; j < logs.size(); j++) { logs.remove(j); }
+
             for (ReplicatedLog curEntry : newEntries) {
                 logs.add(index, curEntry);
                 index++;

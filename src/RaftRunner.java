@@ -13,14 +13,7 @@ public class RaftRunner {
         int port = remoteNodes.get(id).getPort();
 
         RaftNode node = new RaftNode(id, port, remoteNodes);
-
-        //start a thread to listen for messages on the port
-        Server server = new Server(node);
-        server.start();
-
-        System.out.println(Colors.ANSI_PURPLE + "* ");
-        System.out.println("* Started server on port " + node.getPort() + " to listen for messages");
-        System.out.println("*" + Colors.ANSI_RESET);
+        //TODO: restore node state
 
         BufferedReader input = new BufferedReader(new InputStreamReader(System.in));
         System.out.println("Press <enter> to continue...");
@@ -29,6 +22,14 @@ public class RaftRunner {
         } catch (IOException e) {
             e.printStackTrace();
         }
+
+        //start a thread to listen for messages on the port
+        Server server = new Server(node);
+        server.start();
+
+        System.out.println(Colors.ANSI_PURPLE + "* ");
+        System.out.println("* Started server on port " + node.getPort() + " to listen for messages");
+        System.out.println("*" + Colors.ANSI_RESET);
 
         node.run();
 

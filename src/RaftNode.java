@@ -165,7 +165,7 @@ public class RaftNode {
 
         //find the maximum commitState (same as a matchIndex value) where a majority of nodes
         //have a commitState that big
-        int max = -1;
+        int max = commitIndex;
         for (Integer curState : commitStates.keySet()) {
             if (curState > max && commitStates.get(curState) >= MAJORITY) max = curState;
         }

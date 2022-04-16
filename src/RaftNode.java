@@ -16,7 +16,7 @@ public class RaftNode {
 
     private HashMap<Integer, RemoteNode> remoteNodes;
 
-    private ArrayList<ReplicatedLog> logs;
+    volatile private ArrayList<ReplicatedLog> logs;
     private int lastApplied;
 
     volatile private int[] nextIndex, matchIndex;

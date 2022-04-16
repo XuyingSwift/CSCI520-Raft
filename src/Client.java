@@ -8,10 +8,10 @@ import java.io.PrintStream;
 import java.net.Socket;
 
 public class Client extends Thread{
-    String address;
-    int port;
-    Message message;
-    RaftNode node;
+    private String address;
+    private int port;
+    private Message message;
+    private volatile RaftNode node;
 
     public Client(String address, int port, Message message, RaftNode node) {
         this.address = address;

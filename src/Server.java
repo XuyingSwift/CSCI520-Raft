@@ -5,7 +5,7 @@ import java.net.Socket;
 public class Server extends Thread {
     private ServerSocket server;
     private boolean running;
-    private RaftNode node;
+    volatile private RaftNode node;
 
     public Server(RaftNode node) {
         try {

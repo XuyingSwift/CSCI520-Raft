@@ -13,7 +13,7 @@ public class Robot {
     private int targetNode;
     private HashMap<Integer, RemoteNode> remoteNodes;
     public static final String BLOCK_RIGHT = "block with right hand", BLOCK_LEFT = "block with left hand",
-            WIN = "win", LOST = "lost", START = "start", PUNCH_RIGHT = "punch with right hand", PUNCH_LEFT = "punch left with hand",
+             LOST = "lost", PUNCH_RIGHT = "punch with right hand", PUNCH_LEFT = "punch left with hand",
             BLOCKED = "blocked";
             ;
     private String state;
@@ -54,6 +54,7 @@ public class Robot {
             System.out.println(this.name + "made connection with " + this.targetNode);
             PrintStream socketOut = new PrintStream(socket.getOutputStream());
             BufferedReader socketIn = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            // to send out the punch action you can only send out once a second
             socketOut.println(action);
             socketOut.println();
 

@@ -19,7 +19,13 @@ public class RaftRunner {
         System.out.println("Press <enter> to continue...");
         try {
             input.readLine();
-        } catch (IOException e) {
+            System.out.print("Starting in ");
+            for (int i = 7; i >= 1; i--) {
+                System.out.print(i + "..");
+                Thread.sleep(1000);
+            }
+            System.out.print(System.lineSeparator());
+        } catch (IOException | InterruptedException e) {
             e.printStackTrace();
         }
 

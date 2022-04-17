@@ -43,6 +43,7 @@ public class RaftNode {
         nextIndex = new int[remoteNodes.size()];
         matchIndex = new int[remoteNodes.size()];
         commitIndex = -1;
+        votedFor = -1;
     }
 
     public void run() {
@@ -244,7 +245,10 @@ public class RaftNode {
             int index = jsonObject.get(PREV_LOG_INDEX).getAsInt() + 1;
 
             //remove all old entries
-            for (int j = index; j < logs.size(); j++) { logs.remove(j); }
+            if (logs.size() > index) {
+                logs.subList(index, logs.size()).clear();
+            }
+            System.out.println(Colors.ANSI_CYAN + "RaftNode (" + Thread.currentThread().getName() + "): new log size " + logs.size() + Colors.ANSI_RESET);
 
             for (ReplicatedLog curEntry : newEntries) {
                 logs.add(index, curEntry);
@@ -263,12 +267,18 @@ public class RaftNode {
     }
 
     synchronized public void decrementNextIndex(int destination) {
-        nextIndex[destination]--;
+        synchronized (nextIndex) {
+            if (nextIndex[destination] > 0) nextIndex[destination]--;
+        }
     }
 
     synchronized public void increaseNextIndex(int destination, int newNextIndex) {
-        nextIndex[destination] = newNextIndex;
-        matchIndex[destination] = newNextIndex - 1;
+        synchronized (nextIndex) {
+            if (newNextIndex > nextIndex[destination]) {
+                nextIndex[destination] = newNextIndex;
+                matchIndex[destination] = newNextIndex - 1;
+            }
+        }
     }
 
     private void sendRequestVote(int dest) {
@@ -306,7 +316,7 @@ public class RaftNode {
         //and either I haven't voted yet, or I already voted for this node,
         //maybe grant vote
         if (jsonObject.get(CANDIDATE_TERM).getAsInt() >= this.term
-                && (votedFor == null || votedFor == jsonObject.get(CANDIDATE_ID).getAsInt() )) {
+                && (votedFor.equals(-1) || votedFor == jsonObject.get(CANDIDATE_ID).getAsInt() )) {
 
             boolean logIsUpToDate;
             //check if candidate's log is as up to date as mine
@@ -377,7 +387,7 @@ public class RaftNode {
         if (message.getTerm() > term) {
             state = FOLLOW;
             term = message.getTerm();
-            votedFor = null;
+            votedFor = -1;
         }
 
         messageQueue.add(message);

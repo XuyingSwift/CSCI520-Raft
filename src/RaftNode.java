@@ -112,6 +112,7 @@ public class RaftNode {
         state = CANDID;
         // increment its term
         term++;
+        System.out.println(Colors.ANSI_YELLOW + "RaftNode (" + Thread.currentThread().getName() + "): became candidate in term " + term + Colors.ANSI_RESET);
         //start with vote for self
         voteCount = 1;
         // set voted for to the candidate id
@@ -131,7 +132,7 @@ public class RaftNode {
             state = LEADER;
             currentLeader = id;
 
-            System.out.println(Colors.ANSI_YELLOW + "RaftNode (" + Thread.currentThread().getName() + "): became the leader!!" + Colors.ANSI_RESET);
+            System.out.println(Colors.ANSI_YELLOW + "RaftNode (" + Thread.currentThread().getName() + "): became the leader in term " + term + "!!" + Colors.ANSI_RESET);
             Arrays.fill(nextIndex, logs.size()); //re-initialize next index array
             Arrays.fill(matchIndex, -1); //re-initialize matchIndex array
             //TODO: we could send an empty AppendEntries instead of a heartbeat
@@ -248,7 +249,6 @@ public class RaftNode {
             if (logs.size() > index) {
                 logs.subList(index, logs.size()).clear();
             }
-            System.out.println(Colors.ANSI_CYAN + "RaftNode (" + Thread.currentThread().getName() + "): new log size " + logs.size() + Colors.ANSI_RESET);
 
             for (ReplicatedLog curEntry : newEntries) {
                 logs.add(index, curEntry);
@@ -385,6 +385,9 @@ public class RaftNode {
         }
 
         if (message.getTerm() > term) {
+            if (!state.equals(FOLLOW)) {
+                System.out.println(Colors.ANSI_YELLOW + "RaftNode (" + Thread.currentThread().getName() + "): switching to follower, new term " + message.getTerm() + " from node " + message.getSender() + " greater than my term " + term + Colors.ANSI_RESET);
+            }
             state = FOLLOW;
             term = message.getTerm();
             votedFor = -1;

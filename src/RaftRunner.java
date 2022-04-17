@@ -4,32 +4,41 @@ import java.io.InputStreamReader;
 import java.util.HashMap;
 
 public class RaftRunner {
-    public final static int SLOW_FACTOR = 10;
+    public final static int SLOW_FACTOR = 15;
 
     public static void main(String[] args) {
-        int id = Integer.parseInt(args[0]), port = Integer.parseInt(args[1]);
+        //config string format: "0 0 127.0.0.1 5000 1 127.0.0.1 5001 2 127.0.0.1 5002", ...
+        int id = Integer.parseInt(args[0]);
+        HashMap<Integer, RemoteNode> remoteNodes = buildRemoteList(args);
+        int port = remoteNodes.get(id).getPort();
 
-        String config[] = new String[] {"0", "127.0.0.1", "5000", "1", "127.0.0.1", "5001", "2", "127.0.0.1", "5002"};
-
-        RaftNode node = new RaftNode(id, port, buildRemoteList(config));
-
-        //start a thread to listen for messages on the port
-        Server server = new Server(node);
-        server.start();
-
-        System.out.println(Colors.ANSI_PURPLE + "* ");
-        System.out.println("* Started server on port " + node.getPort() + " to listen for messages");
-        System.out.println("*" + Colors.ANSI_RESET);
-
+        RaftNode node = new RaftNode(id, port, remoteNodes);
+        //TODO: restore node state
+        // if the file is not null, then I read in that restore, delete that file, restart from scratch
         BufferedReader input = new BufferedReader(new InputStreamReader(System.in));
         System.out.println("Press <enter> to continue...");
         try {
             input.readLine();
-        } catch (IOException e) {
+            System.out.print("Starting in ");
+            for (int i = 7; i >= 1; i--) {
+                System.out.print(i + "..");
+                Thread.sleep(1000);
+            }
+            System.out.print(System.lineSeparator());
+        } catch (IOException | InterruptedException e) {
             e.printStackTrace();
         }
 
-        node.run();
+        //start a thread to listen for messages on the port
+        Server server = new Server(node);
+        server.start();
+        System.out.println(Colors.ANSI_PURPLE + "* Started server on port " + node.getPort() + " to listen for messages" + Colors.ANSI_RESET);
+
+        try {
+            node.run();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
         System.out.println("Press <enter> to quit...");
         try {
@@ -52,7 +61,7 @@ public class RaftRunner {
     private static HashMap<Integer, RemoteNode> buildRemoteList(String[] config) {
         HashMap<Integer, RemoteNode> remotes = new HashMap<>();
 
-        int idx = 0;
+        int idx = 1;
         while (idx < config.length) {
             int curId = Integer.parseInt(config[idx]);
             idx++;

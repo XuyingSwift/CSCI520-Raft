@@ -1,0 +1,6 @@
+>write log to disk
+>read log from disk on startup
+
+>test with 5 nodes
+>test with shorter timing
+>deploy on AWS

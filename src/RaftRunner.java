@@ -14,7 +14,7 @@ public class RaftRunner {
 
         RaftNode node = new RaftNode(id, port, remoteNodes);
         //TODO: restore node state
-
+        // if the file is not null, then I read in that restore, delete that file, restart from scratch
         BufferedReader input = new BufferedReader(new InputStreamReader(System.in));
         System.out.println("Press <enter> to continue...");
         try {
@@ -28,7 +28,11 @@ public class RaftRunner {
         server.start();
         System.out.println(Colors.ANSI_PURPLE + "* Started server on port " + node.getPort() + " to listen for messages" + Colors.ANSI_RESET);
 
-        node.run();
+        try {
+            node.run();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
         System.out.println("Press <enter> to quit...");
         try {

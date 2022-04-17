@@ -13,17 +13,6 @@ public class RaftRunner {
         HashMap<Integer, RemoteNode> remoteNodes = buildRemoteList(args);
         int port = remoteNodes.get(id).getPort();
 
-        /*String robotName;
-        Scanner input = new Scanner(System.in);
-
-        System.out.println("Let's Start our game!");
-        System.out.println("-------------------------");
-        System.out.println("Enter an robot name");
-        robotName = input.toString();
-
-        Robot robot = new Robot(robotName, id, remoteNodes);
-        robot.displayMenu();*/
-
         RaftNode node = new RaftNode(id, port, remoteNodes);
         //TODO: restore node state
         // if the file is not null, then I read in that restore, delete that file, restart from scratch

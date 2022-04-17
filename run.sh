@@ -3,7 +3,7 @@
 echo -n "Enter Node ID: "
 read nodeId
 
-configStr="0 127.0.0.1 5000 1 127.0.0.1 5001 2 127.0.0.1 5002"
+configStr="0 127.0.0.1 5000 1 127.0.0.1 5001 2 127.0.0.1 5002 3 127.0.0.1 5003 4 127.0.0.1 5004"
 args="$nodeId $configStr"
 echo $args
 

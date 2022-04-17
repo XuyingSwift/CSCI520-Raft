@@ -22,8 +22,7 @@ public class RaftRunner {
         robotName = input.toString();
 
         Robot robot = new Robot(robotName, id, remoteNodes);
-        int selection = displayMenu();
-        robot.sendAction(selection);
+        robot.displayMenu();
 
         RaftNode node = new RaftNode(id, port, remoteNodes);
         //TODO: restore node state
@@ -71,20 +70,6 @@ public class RaftRunner {
         System.out.println("*" + Colors.ANSI_RESET);
     }
 
-
-    private static int displayMenu() {
-        int selection;
-        Scanner input = new Scanner(System.in);
-
-        System.out.println("Enter 1 for punch with left hand ");
-        System.out.println("Enter 2 for punch with right hand ");
-        System.out.println("Enter 3 for block with left hand ");
-        System.out.println("Enter 4 for block with right hand ");
-        System.out.println("Enter 0 for quiting the game");
-
-        selection = input.nextInt();
-        return selection;
-    }
     private static HashMap<Integer, RemoteNode> buildRemoteList(String[] config) {
         HashMap<Integer, RemoteNode> remotes = new HashMap<>();
 

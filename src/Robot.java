@@ -13,9 +13,10 @@ public class Robot {
     private int targetNode;
     private HashMap<Integer, RemoteNode> remoteNodes;
     public static final String BLOCK_RIGHT = "block with right hand", BLOCK_LEFT = "block with left hand",
-            WIN = "win", LOST = "lost", START = "start", PUNCH_RIGHT = "punch with right hand", PUNCH_LEFT = "punch left with hand" ;
+            WIN = "win", LOST = "lost", START = "start", PUNCH_RIGHT = "punch with right hand", PUNCH_LEFT = "punch left with hand",
+            BLOCKED = "blocked";
+            ;
     private String state;
-
 
     public Robot (String name, int targetNode, HashMap<Integer, RemoteNode> remoteNodes) {
         this.name = name;
@@ -26,6 +27,9 @@ public class Robot {
 
     public void sendAction(int selection) {
         switch (selection) {
+            case 0:
+                System.out.println("GAME OVER");
+                System.exit(0);
             case 1:
                 punchLeft();
                 break;
@@ -50,14 +54,14 @@ public class Robot {
             System.out.println(this.name + "made connection with " + this.targetNode);
             PrintStream socketOut = new PrintStream(socket.getOutputStream());
             BufferedReader socketIn = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            String command = action;
-            socketOut.println(command);
+            socketOut.println(action);
             socketOut.println();
 
             for (String resp = socketIn.readLine(); resp != null; resp = socketIn.readLine()) {
-                System.out.println("returning message from the node");
+                String reply = resp;
+                System.out.println("returning message from the node"  + resp);
+                checkStates(reply);
             }
-
             socketIn.close();
             socketOut.close();
             socket.close();
@@ -67,6 +71,49 @@ public class Robot {
         return true;
     }
 
+    public void checkStates(String reply) {
+        Random rand = new Random();
+        int int_random = rand.nextInt(100);
+        // replay is punch with left
+        if (reply.equals(PUNCH_LEFT)) {
+            if (this.state != BLOCK_RIGHT) {
+                // here we check the 10% chance
+                // KO. robot is knocked out
+                if (int_random < 10) {
+                    this.state = LOST;
+                    System.out.println(this.name + " is Lost");
+                    System.out.println("GAME OVER");
+                    System.out.println("Do you want to restart a game?");
+                    // if yes, then restart the game
+                    displayMenu();
+                }
+            }else {
+                this.state = BLOCKED;
+                sendMessage(BLOCKED);
+            }
+        }
+
+        if (reply.equals(PUNCH_RIGHT)) {
+            // replay is punch with right hand
+            if (this.state != BLOCK_LEFT) {
+                if (int_random < 10) {
+                    this.state = LOST;
+                    System.out.println(this.name + " is Lost");
+                    System.out.println("GAME OVER");
+                    System.out.println("Do you want to restart a game?");
+                    displayMenu();
+                    // if yes, then restart the game
+                }
+            }else {
+                this.state = BLOCKED;
+                sendMessage(BLOCKED);
+            }
+        }
+
+        if (reply.equals(BLOCKED)) {
+            //  make the robot sleep for 3 second.
+        }
+    }
     public void punchRight() {
         System.out.println(this.name + " punched with right hand ");
         // method to send to leader
@@ -88,12 +135,18 @@ public class Robot {
         sendMessage(BLOCK_LEFT);
     }
 
-    public void miss() {
-        System.out.println(this.name + " missed");
-    }
 
-    public void hit() {
-        System.out.println(this.name + " hit successfully");
-    }
+    public int displayMenu() {
+        int selection;
+        Scanner input = new Scanner(System.in);
 
+        System.out.println("Enter 1 for punch with left hand ");
+        System.out.println("Enter 2 for punch with right hand ");
+        System.out.println("Enter 3 for block with left hand ");
+        System.out.println("Enter 4 for block with right hand ");
+        System.out.println("Enter 0 for quiting the game");
+
+        selection = input.nextInt();
+        return selection;
+    }
 }

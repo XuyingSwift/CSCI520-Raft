@@ -13,7 +13,7 @@ public class RaftRunner {
         HashMap<Integer, RemoteNode> remoteNodes = buildRemoteList(args);
         int port = remoteNodes.get(id).getPort();
 
-        String robotName;
+        /*String robotName;
         Scanner input = new Scanner(System.in);
 
         System.out.println("Let's Start our game!");
@@ -22,7 +22,7 @@ public class RaftRunner {
         robotName = input.toString();
 
         Robot robot = new Robot(robotName, id, remoteNodes);
-        robot.displayMenu();
+        robot.displayMenu();*/
 
         RaftNode node = new RaftNode(id, port, remoteNodes);
         //TODO: restore node state

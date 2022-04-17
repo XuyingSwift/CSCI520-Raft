@@ -2,6 +2,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.HashMap;
+import java.util.Scanner;
 
 public class RaftRunner {
     public final static int SLOW_FACTOR = 15;
@@ -12,13 +13,25 @@ public class RaftRunner {
         HashMap<Integer, RemoteNode> remoteNodes = buildRemoteList(args);
         int port = remoteNodes.get(id).getPort();
 
+        String robotName;
+        Scanner input = new Scanner(System.in);
+
+        System.out.println("Let's Start our game!");
+        System.out.println("-------------------------");
+        System.out.println("Enter an robot name");
+        robotName = input.toString();
+
+        Robot robot = new Robot(robotName, id, remoteNodes);
+        int selection = displayMenu();
+        robot.sendAction(selection);
+
         RaftNode node = new RaftNode(id, port, remoteNodes);
         //TODO: restore node state
         // if the file is not null, then I read in that restore, delete that file, restart from scratch
-        BufferedReader input = new BufferedReader(new InputStreamReader(System.in));
+        BufferedReader inputB = new BufferedReader(new InputStreamReader(System.in));
         System.out.println("Press <enter> to continue...");
         try {
-            input.readLine();
+            inputB.readLine();
             System.out.print("Starting in ");
             for (int i = 7; i >= 1; i--) {
                 System.out.print(i + "..");
@@ -42,7 +55,7 @@ public class RaftRunner {
 
         System.out.println("Press <enter> to quit...");
         try {
-            input.readLine();
+            inputB.readLine();
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -58,6 +71,20 @@ public class RaftRunner {
         System.out.println("*" + Colors.ANSI_RESET);
     }
 
+
+    private static int displayMenu() {
+        int selection;
+        Scanner input = new Scanner(System.in);
+
+        System.out.println("Enter 1 for punch with left hand ");
+        System.out.println("Enter 2 for punch with right hand ");
+        System.out.println("Enter 3 for block with left hand ");
+        System.out.println("Enter 4 for block with right hand ");
+        System.out.println("Enter 0 for quiting the game");
+
+        selection = input.nextInt();
+        return selection;
+    }
     private static HashMap<Integer, RemoteNode> buildRemoteList(String[] config) {
         HashMap<Integer, RemoteNode> remotes = new HashMap<>();
 

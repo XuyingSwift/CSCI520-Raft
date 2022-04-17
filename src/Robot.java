@@ -1,21 +1,30 @@
+import com.google.gson.Gson;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.Scanner;
+import java.io.PrintStream;
+import java.net.Socket;
+import java.util.*;
 
 // we need socket programming
 public class Robot {
     private String name;
-    public static final String BLOCK_R = "block right", BLOCK_L = "block left",
-            WIN = "win", LOST = "lost", START = "start", PUNCH_RIGHT = "punch right", PUNCH_LEFT = "punch left" ;
-    public String state;
-    public Robot (String name) {
+    private int targetNode;
+    private HashMap<Integer, RemoteNode> remoteNodes;
+    public static final String BLOCK_RIGHT = "block with right hand", BLOCK_LEFT = "block with left hand",
+            WIN = "win", LOST = "lost", START = "start", PUNCH_RIGHT = "punch with right hand", PUNCH_LEFT = "punch left with hand" ;
+    private String state;
+
+
+    public Robot (String name, int targetNode, HashMap<Integer, RemoteNode> remoteNodes) {
         this.name = name;
-        state = null;
+        this.state = null;
+        this.targetNode = targetNode;
+        this.remoteNodes = remoteNodes;
     }
 
-    public void sendAction() {
-        int selection = displayMenu();
+    public void sendAction(int selection) {
         switch (selection) {
             case 1:
                 punchLeft();
@@ -34,44 +43,49 @@ public class Robot {
         }
     }
 
-    public void receiveAction(String payload) {
-        if (this.state =
+    public boolean sendMessage(String action) {
+        System.out.println( this.name + " Sending message to node " + this.targetNode);
+        try {
+            Socket socket = new Socket(this.remoteNodes.get(this.targetNode).getAddress(), this.remoteNodes.get(this.targetNode).getPort());
+            System.out.println(this.name + "made connection with " + this.targetNode);
+            PrintStream socketOut = new PrintStream(socket.getOutputStream());
+            BufferedReader socketIn = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            String command = action;
+            socketOut.println(command);
+            socketOut.println();
 
-        )
-    }
+            for (String resp = socketIn.readLine(); resp != null; resp = socketIn.readLine()) {
+                System.out.println("returning message from the node");
+            }
 
-    public int displayMenu() {
-        int selection;
-        Scanner input = new Scanner(System.in);
-
-        System.out.println("Let's Start our game!");
-        System.out.println("-------------------------");
-        System.out.println("Enter an robot name");
-        System.out.println("Enter 1 for punch with left hand ");
-        System.out.println("Enter 2 for punch with right hand ");
-        System.out.println("Enter 3 for block with left hand ");
-        System.out.println("Enter 4 for block with right hand ");
-        System.out.println("Enter 0 for quiting the game");
-
-        selection = input.nextInt();
-        return selection;
+            socketIn.close();
+            socketOut.close();
+            socket.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return true;
     }
 
     public void punchRight() {
         System.out.println(this.name + " punched with right hand ");
         // method to send to leader
+        sendMessage(PUNCH_RIGHT);
     }
 
     public void punchLeft() {
         System.out.println(this.name + " punched with left hand ");
+        sendMessage(PUNCH_LEFT);
     }
 
     public void blockRight() {
         System.out.println(this.name + " blocked with right hand");
+        sendMessage(BLOCK_LEFT);
     }
 
     public void blockLeft() {
         System.out.println(this.name + " blocked with left hand");
+        sendMessage(BLOCK_LEFT);
     }
 
     public void miss() {

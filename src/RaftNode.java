@@ -75,6 +75,7 @@ public class RaftNode {
 
                 //TESTING BLOCK
                 //add an entry to the log on an average of 1 out of every 7 heartbeats
+                /*
                 Random rand = new Random();
                 counter++;
                 if (rand.nextInt(7) == 4) {
@@ -83,6 +84,7 @@ public class RaftNode {
                     writeToDisk("testing_block");
                     System.out.println(Colors.ANSI_YELLOW + "RaftNode (" + Thread.currentThread().getName() + "): Added " + "command #" + id + "-" + counter + " to log" + Colors.ANSI_RESET);
                 }
+                */
                 //END TESTING BLOCK
             }
 
@@ -375,19 +377,22 @@ public class RaftNode {
         return response.toString();
     }
 
-    private String receiveCommand(String payload) {
+    private String receiveCommand(String payload, int sender) {
         JsonObject response = new JsonObject();
-        HashMap<String, String>  diskInfo= new HashMap<>();
 
         if (!state.equals(LEADER)) {
             System.out.println(Colors.ANSI_RED + "WARNING RaftNode (" + Thread.currentThread().getName() + "): not the leader but tried to process a command" + Colors.ANSI_RESET);
-            response.addProperty("result", false);
+            response.addProperty(TYPE, REDIRECT);
+            response.addProperty(CURRENT_LEADER, currentLeader);
         }
         else {
             JsonObject jsonObject = new JsonParser().parse(payload).getAsJsonObject();
-            ReplicatedLog newLog = new ReplicatedLog(term, "dummy command");
+            String command = jsonObject.get(COMMAND).getAsString();
+            ReplicatedLog newLog = new ReplicatedLog(term, command);
             logs.add(newLog);
-            response.addProperty("result", true);
+            System.out.println(Colors.ANSI_YELLOW + "RaftNode (" + Thread.currentThread().getName() + "): Added command " + command + " from " + sender + " to log" + Colors.ANSI_RESET);
+            response.addProperty(TYPE, REACTION);
+            response.addProperty(REACTION, true);
         }
 
         try {
@@ -467,7 +472,7 @@ public class RaftNode {
             messageReplies.put(curMessage.getGuid(), retVal);
         }
         else if (curMessage.getType().equals(COMMAND)) {
-            retVal = receiveCommand(curMessage.getPayload());
+            retVal = receiveCommand(curMessage.getPayload(), curMessage.getSender());
             System.out.println(Colors.ANSI_CYAN + "RaftNode (" + Thread.currentThread().getName() + "): message [" + curMessage.getGuid() + "] response: " + retVal + Colors.ANSI_RESET);
             messageReplies.put(curMessage.getGuid(), retVal);
         }
@@ -489,7 +494,7 @@ public class RaftNode {
         writer.write(diskInfo.toString());
         writer.close();
     }
-    
+
     public void restoreStateFromFile() {
         String fileName = "Node_" + id + "_log.json";
         Reader fileReader;

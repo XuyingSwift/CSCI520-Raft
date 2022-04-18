@@ -4,7 +4,7 @@ import java.io.InputStreamReader;
 import java.util.HashMap;
 
 public class RobotRunner {
-    public static void main(String[] args, String[] robotArgs) {
+    public static void main(String[] args) {
         //config string format: "0 0 127.0.0.1 5000 1 127.0.0.1 5001 2 127.0.0.1 5002", ...
         int id = Integer.parseInt(args[0]);
         HashMap<Integer, RemoteNode> remoteNodes = buildRemoteList(args);
@@ -20,8 +20,18 @@ public class RobotRunner {
         }
 
         Robot robot = new Robot(name, id, remoteNodes);
-        int selection = robot.displayMenu();
-        robot.sendAction(selection);
+        int selection = -1;
+
+        while (selection != 0) {
+            selection = robot.displayMenu();
+
+            if (selection != 0) {
+                robot.sendAction(selection);
+            }
+            else {
+                System.out.println("Goodbye");
+            }
+        }
     }
 
     private static HashMap<Integer, RemoteNode> buildRemoteList(String[] config) {

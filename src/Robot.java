@@ -50,14 +50,14 @@ public class Robot {
     }
 
     public boolean sendMessage(String action) {
-        System.out.println( this.name + " Sending message to node " + this.targetNode);
         String response = null;
         JsonObject jsonObject = null;
 
-        while (jsonObject == null || jsonObject.get(RaftNode.TYPE).equals(RaftNode.REDIRECT)) {
+        while (jsonObject == null || jsonObject.get(RaftNode.TYPE).getAsString().equals(RaftNode.REDIRECT)) {
             try {
+                System.out.println( this.name + " Sending message to node " + this.targetNode);
                 Socket socket = new Socket(this.remoteNodes.get(this.targetNode).getAddress(), this.remoteNodes.get(this.targetNode).getPort());
-                System.out.println(this.name + "made connection with " + this.targetNode);
+                System.out.println(this.name + " made connection with " + this.targetNode);
                 PrintStream socketOut = new PrintStream(socket.getOutputStream());
                 BufferedReader socketIn = new BufferedReader(new InputStreamReader(socket.getInputStream()));
                 // to send out the punch action you can only send out once a second
@@ -71,6 +71,7 @@ public class Robot {
                 socketOut.println(messageJson);
                 socketOut.println();
                 String msg = socketIn.readLine();
+                response = null;
                 while(msg != null && msg.length() > 0) {
                     if (response == null) response = msg;
                     else response += msg;
@@ -82,10 +83,13 @@ public class Robot {
                 socketOut.close();
                 socket.close();
 
+                System.out.println("Cluster response: " + response);
                 jsonObject = new JsonParser().parse(response).getAsJsonObject();
 
-                if (jsonObject.get(RaftNode.TYPE).equals(RaftNode.REDIRECT)) {
+                if (jsonObject.get(RaftNode.TYPE).getAsString().equals(RaftNode.REDIRECT)) {
                     String newLeader = jsonObject.get(RaftNode.CURRENT_LEADER).getAsString();
+                    System.out.println("Got redirected to node " + newLeader);
+
                     if (newLeader.equals("none")) {
                         Random rand = new Random();
                         targetNode = rand.nextInt(remoteNodes.size()); //try again with a random node

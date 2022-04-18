@@ -1,6 +1,9 @@
 import com.google.gson.*;
 import com.google.gson.reflect.TypeToken;
 
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.*;
 
 public class RaftNode {
@@ -8,8 +11,9 @@ public class RaftNode {
             CANDIDATE_ID = "candidateId", CANDIDATE_TERM = "candidateTerm",
             LEADER_TERM = "leaderTerm", LEADER_ID = "leaderId",
             PREV_LOG_INDEX = "prevLogIndex", PREV_LOG_TERM = "prevLogTerm", ENTRIES = "entries", LEADER_COMMIT = "leaderCommit",
-            LAST_LOG_INDEX = "lastLogIndex", LAST_LOG_TERM = "lastLogTerm";
+            LAST_LOG_INDEX = "lastLogIndex", LAST_LOG_TERM = "lastLogTerm", CURRENT_LEADER = "current leader";
     private final String FOLLOW = "FOLLOWER", CANDID = "CANDIDATE", LEADER = "LEADER";
+    public static final String REDIRECT = "redirect", REACTION = "reaction", TYPE = "type";
 
     private final int HEARTBEAT_TIME = 50 * RaftRunner.SLOW_FACTOR, MAJORITY;
     private int port, id;
@@ -46,7 +50,7 @@ public class RaftNode {
         votedFor = -1;
     }
 
-    public void run() {
+    public void run() throws IOException {
         /*
          * WHILE TRUE:
          * If leader then send heartbeat (empty append entries)
@@ -75,8 +79,12 @@ public class RaftNode {
                 //add an entry to the log on an average of 1 out of every 7 heartbeats
                 Random rand = new Random();
                 counter++;
+                HashMap<String, String> logsToDisk = new HashMap<>();
                 if (rand.nextInt(7) == 4) {
                     logs.add(new ReplicatedLog(term, "command #" + id + "-" + counter));
+                    // write the disk
+                    logsToDisk.put("Command", logs.toString());
+                    writeToDisk(logs.toString());
                     System.out.println(Colors.ANSI_YELLOW + "RaftNode (" + Thread.currentThread().getName() + "): Added " + "command #" + id + "-" + counter + " to log" + Colors.ANSI_RESET);
                 }
                 //END TESTING BLOCK
@@ -120,6 +128,15 @@ public class RaftNode {
         // reset the term timer
         timer.reset();
 
+        HashMap<String, String> termVotedFor = new HashMap<>();
+        // write term, votedfor and log to disk
+        termVotedFor.put("term", this.term.toString());
+        termVotedFor.put("votedFor", this.votedFor.toString());
+        try {
+            writeToDisk(termVotedFor.toString());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         //send a requestVote to all other nodes
         for (Integer remoteNode : remoteNodes.keySet()) {
             if (remoteNode.equals(id)) continue;
@@ -215,6 +232,9 @@ public class RaftNode {
     private String receiveAppendEntries(String payload) {
         JsonObject jsonObject = new JsonParser().parse(payload).getAsJsonObject();
         JsonObject response = new JsonObject();
+        HashMap<String, String>  diskInfo= new HashMap<>();
+        HashMap<String, String> termVotedFor = new HashMap<>();
+
 
         if (jsonObject.get(LEADER_TERM).getAsInt() < term) {            
             response.addProperty("result", false);
@@ -263,6 +283,18 @@ public class RaftNode {
             response.addProperty("newNextIndex", logs.size());
         }
 
+        // write the term, votedfor and log to disk
+        termVotedFor.put("term", this.term.toString());
+        termVotedFor.put("votedFor", this.votedFor.toString());
+
+        diskInfo.put("receiveAppendEntries", termVotedFor.toString());
+        diskInfo.put("reReceiveAppendEntries", response.toString());
+
+        try {
+            writeToDisk(diskInfo.toString());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         return response.toString();
     }
 
@@ -311,7 +343,10 @@ public class RaftNode {
     private String receiveRequestVote(String payload) {
         JsonObject response = new JsonObject();
         JsonObject jsonObject = new JsonParser().parse(payload).getAsJsonObject();
-        
+        HashMap<String, String>  diskInfo= new HashMap<>();
+        HashMap<String, String> termVotedFor = new HashMap<>();
+
+
         //if the sending node's term is at least as high as my term
         //and either I haven't voted yet, or I already voted for this node,
         //maybe grant vote
@@ -349,12 +384,22 @@ public class RaftNode {
         else {
             response.addProperty("result", false);
         }
-
+        //  write the new term, votedfor and log in the disk,
+        termVotedFor.put("term", this.term.toString());
+        termVotedFor.put("votedFor", this.votedFor.toString());
+        diskInfo.put("receiveRequestVote", termVotedFor.toString());
+        diskInfo.put("reReceiveRequestVote", response.toString());
+        try {
+            writeToDisk(diskInfo.toString());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         return response.toString();
     }
 
     private String receiveCommand(String payload) {
         JsonObject response = new JsonObject();
+        HashMap<String, String>  diskInfo= new HashMap<>();
 
         if (!state.equals(LEADER)) {
             System.out.println(Colors.ANSI_RED + "WARNING RaftNode (" + Thread.currentThread().getName() + "): not the leader but tried to process a command" + Colors.ANSI_RESET);
@@ -367,33 +412,52 @@ public class RaftNode {
             response.addProperty("result", true);
         }
 
+        // write the log to disk. use the method name as the key
+        diskInfo.put("receiveCommand", response.toString());
+        try {
+            writeToDisk(diskInfo.toString());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         return response.toString();
     }
 
     synchronized public void receiveMessage(Message message) {
-        if (message == null) {
-            System.out.println(Colors.ANSI_RED + ">>>WARNING RaftNode (" + Thread.currentThread().getName() + "): putting NULL message on queue" + Colors.ANSI_RESET);
-        }
-
-        if (message.getType().equals(REQ_VOTE) && (message.getTerm() > term || (message.getTerm() >= term && votedFor.equals(message.getSender())))) {
-            timer.reset();
-        }
-
-        if (message.getTerm() >= term && message.getType().equals(APPEND)) {
-            timer.reset();
-            currentLeader = message.getSender();
-        }
-
-        if (message.getTerm() > term) {
-            if (!state.equals(FOLLOW)) {
-                System.out.println(Colors.ANSI_YELLOW + "RaftNode (" + Thread.currentThread().getName() + "): switching to follower, new term " + message.getTerm() + " from node " + message.getSender() + " greater than my term " + term + Colors.ANSI_RESET);
+        if (message.getType().equals(COMMAND)) {
+            if (this.state.equals(LEADER)) {
+                messageQueue.add(message);
+            } else {
+                // make a response for the robot and send it back
+                JsonObject jsonObject = new JsonObject();
+                jsonObject.addProperty(TYPE, REDIRECT);
+                jsonObject.addProperty(CURRENT_LEADER, this.currentLeader);
+                this.messageReplies.put(message.getGuid(), jsonObject.toString());
             }
-            state = FOLLOW;
-            term = message.getTerm();
-            votedFor = -1;
-        }
+        } else {
+            if (message == null) {
+                System.out.println(Colors.ANSI_RED + ">>>WARNING RaftNode (" + Thread.currentThread().getName() + "): putting NULL message on queue" + Colors.ANSI_RESET);
+            }
 
-        messageQueue.add(message);
+            if (message.getType().equals(REQ_VOTE) && (message.getTerm() > term || (message.getTerm() >= term && votedFor.equals(message.getSender())))) {
+                timer.reset();
+            }
+
+            if (message.getTerm() >= term && message.getType().equals(APPEND)) {
+                timer.reset();
+                currentLeader = message.getSender();
+            }
+
+            if (message.getTerm() > term) {
+                if (!state.equals(FOLLOW)) {
+                    System.out.println(Colors.ANSI_YELLOW + "RaftNode (" + Thread.currentThread().getName() + "): switching to follower, new term " + message.getTerm() + " from node " + message.getSender() + " greater than my term " + term + Colors.ANSI_RESET);
+                }
+                state = FOLLOW;
+                term = message.getTerm();
+                votedFor = -1;
+            }
+
+            messageQueue.add(message);
+        }
     }
 
     public synchronized HashMap<UUID, String> getMessageReplies() {
@@ -428,4 +492,14 @@ public class RaftNode {
             System.out.println(Colors.ANSI_RED + "ERROR RaftNode (" + Thread.currentThread().getName() + "): UNSUPPORTED MESSAGE TYPE " + curMessage.getType() + Colors.ANSI_RESET);
         }
     }
+
+    public void writeToDisk(String payload) throws IOException {
+        String fileName = "Node" + "_log.json";
+        BufferedWriter writer = new BufferedWriter(new FileWriter(fileName));
+        Gson gson = new Gson();
+        writer.write(gson.toJson(payload));
+        writer.close();
+    }
+
+    //TODO: read in node state from the disk so it can restore
 }

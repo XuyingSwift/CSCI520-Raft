@@ -1,7 +1,7 @@
 import java.util.UUID;
 
 public class Message {
-    private String type, payload;
+    private String type, payload, command;
     private int sender, destination, term;
     private UUID guid;
 
@@ -12,6 +12,13 @@ public class Message {
         this.term = term;
         this.type = type;
         this.payload = payload;
+    }
+
+    public Message(int sender, String type, String payload) {
+        this.type = type;
+        this.payload = payload;
+        this.guid = UUID.randomUUID();
+        this.sender = sender;
     }
 
     public UUID getGuid() { return guid; }

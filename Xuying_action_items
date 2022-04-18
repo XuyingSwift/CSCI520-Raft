@@ -1,0 +1,7 @@
+1: when responses return ture, change the text color for easy explanation
+2: socket for Robot to talk to the cluster,
+3: the logic for Robot game
+4: write logs, term and votedfor to disk
+5: run it on aws
+6: manually kill a node and start it again
+7: recover method in the Raftrunner class

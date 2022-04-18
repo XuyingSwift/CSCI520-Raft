@@ -3,7 +3,7 @@ import java.util.Random;
 public class StateMachine {
     public static final String BLOCK_RIGHT = "block with right hand", BLOCK_LEFT = "block with left hand",
             LOST = "lost", PUNCH_RIGHT = "punch with right hand", PUNCH_LEFT = "punch left with hand",
-            BLOCKED = "blocked", START="start";
+            BLOCKED = "blocked", START="start", WIN = "WIN";
     private String state;
 
     public StateMachine() {
@@ -15,15 +15,22 @@ public class StateMachine {
     }
 
     public void checkStates(String command) {
+        if (command.equals(BLOCK_LEFT) || command.equals(BLOCK_RIGHT) || command.equals(LOST)) {
+            this.state = command;
+        }
+    }
+
+    public void checkStates (String command, String opponentState) {
         Random rand = new Random();
         int int_random = rand.nextInt(100);
         // replay is punch with left
         if (command.equals(PUNCH_LEFT)) {
-            if (this.state != BLOCK_RIGHT) {
+            this.state = PUNCH_LEFT;
+            if (opponentState != BLOCK_RIGHT) {
                 // here we check the 10% chance
                 // KO. robot is knocked out
                 if (int_random < 10) {
-                    this.state = LOST;
+                    this.state = WIN;
                 }
             }else {
                 this.state = BLOCKED;
@@ -32,9 +39,10 @@ public class StateMachine {
 
         if (command.equals(PUNCH_RIGHT)) {
             // replay is punch with right hand
-            if (this.state != BLOCK_LEFT) {
+            this.state = PUNCH_RIGHT;
+            if (opponentState != BLOCK_LEFT) {
                 if (int_random < 10) {
-                    this.state = LOST;
+                    this.state = WIN;
                 }
             }else {
                 this.state = BLOCKED;

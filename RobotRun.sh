@@ -6,4 +6,4 @@ args="$robotId $configStr "
 echo $args
 
 cd out/production/csci-520_raft_consensus/
-java RaftRunner $args
+java RobotRunner $args

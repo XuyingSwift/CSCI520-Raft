@@ -65,6 +65,7 @@ public class Robot {
                 Gson gson = new Gson();
                 HashMap<String, String> actionInfo = new HashMap<>();
                 actionInfo.put(RaftNode.COMMAND, action);
+                actionInfo.put(RaftNode.ROBOT_ID, String.valueOf(id));
                 String actionMessage = gson.toJson(actionInfo);
                 Message message = new Message(this.id, RaftNode.COMMAND, actionMessage);
                 String messageJson = gson.toJson(message);

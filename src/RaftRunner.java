@@ -17,8 +17,7 @@ public class RaftRunner {
         //restore any node state from disk
         node.restoreStateFromFile();
 
-        //TODO: restore node state
-        // if the file is not null, then I read in that restore, delete that file, restart from scratch
+        // if the file exists, then I read in that restore
         BufferedReader input = new BufferedReader(new InputStreamReader(System.in));
         System.out.println("Press <enter> to continue...");
         try {

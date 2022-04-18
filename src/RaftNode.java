@@ -11,12 +11,13 @@ public class RaftNode {
             PREV_LOG_INDEX = "prevLogIndex", PREV_LOG_TERM = "prevLogTerm", ENTRIES = "entries", LEADER_COMMIT = "leaderCommit",
             LAST_LOG_INDEX = "lastLogIndex", LAST_LOG_TERM = "lastLogTerm", CURRENT_LEADER = "current leader";
     private final String FOLLOW = "FOLLOWER", CANDID = "CANDIDATE", LEADER = "LEADER";
-    public static final String REDIRECT = "redirect", REACTION = "reaction", TYPE = "type";
+    public static final String REDIRECT = "redirect", REACTION = "reaction", TYPE = "type", ROBOT_ID = "robotId";
 
     private final int HEARTBEAT_TIME = 50 * RaftRunner.SLOW_FACTOR, MAJORITY;
     private int port, id;
 
     private HashMap<Integer, RemoteNode> remoteNodes;
+    private HashMap<Integer, StateMachine> robotStates;
 
     volatile private ArrayList<ReplicatedLog> logs;
     private int lastApplied;
@@ -46,6 +47,8 @@ public class RaftNode {
         matchIndex = new int[remoteNodes.size()];
         commitIndex = -1;
         votedFor = -1;
+        lastApplied = -1;
+        robotStates = new HashMap<>();
     }
 
     public void run() throws IOException {
@@ -72,20 +75,6 @@ public class RaftNode {
             if (state.equals(LEADER) && ((System.nanoTime() - lastHeartbeat) / 1000000) >= HEARTBEAT_TIME) {
                 sendHeartbeat();
                 lastHeartbeat = System.nanoTime();
-
-                //TESTING BLOCK
-                //add an entry to the log on an average of 1 out of every 7 heartbeats
-                /*
-                Random rand = new Random();
-                counter++;
-                if (rand.nextInt(7) == 4) {
-                    logs.add(new ReplicatedLog(term, "command #" + id + "-" + counter));
-                    // write the disk
-                    writeToDisk("testing_block");
-                    System.out.println(Colors.ANSI_YELLOW + "RaftNode (" + Thread.currentThread().getName() + "): Added " + "command #" + id + "-" + counter + " to log" + Colors.ANSI_RESET);
-                }
-                */
-                //END TESTING BLOCK
             }
 
             while (!messageQueue.isEmpty()) {
@@ -102,6 +91,8 @@ public class RaftNode {
                     System.out.println(Colors.ANSI_RED + "WARNING RaftNode (" + Thread.currentThread().getName() + "): found a smaller commit index of " + newCommitIndex + Colors.ANSI_RESET);
                 }
             }
+
+            if (commitIndex > lastApplied) updateStateMachines();
 
             if (timer.isExpired() && !state.equals(LEADER)) startElection();
         }
@@ -377,30 +368,33 @@ public class RaftNode {
         return response.toString();
     }
 
-    private String receiveCommand(String payload, int sender) {
+    private String receiveCommand(String payload, int sender, UUID guid) {
         JsonObject response = new JsonObject();
+        if (!robotStates.containsKey(sender)) { robotStates.put(sender, new StateMachine()); }
 
+        boolean commandAdded = false;
         if (!state.equals(LEADER)) {
             System.out.println(Colors.ANSI_RED + "WARNING RaftNode (" + Thread.currentThread().getName() + "): not the leader but tried to process a command" + Colors.ANSI_RESET);
             response.addProperty(TYPE, REDIRECT);
             response.addProperty(CURRENT_LEADER, currentLeader);
         }
         else {
-            JsonObject jsonObject = new JsonParser().parse(payload).getAsJsonObject();
-            String command = jsonObject.get(COMMAND).getAsString();
-            ReplicatedLog newLog = new ReplicatedLog(term, command);
+            //inject message UUID into command for log
+            JsonObject commandJson = new JsonParser().parse(payload).getAsJsonObject();
+            commandJson.addProperty("message_guid", guid.toString());
+
+            ReplicatedLog newLog = new ReplicatedLog(term, commandJson.toString());
             logs.add(newLog);
-            System.out.println(Colors.ANSI_YELLOW + "RaftNode (" + Thread.currentThread().getName() + "): Added command " + command + " from " + sender + " to log" + Colors.ANSI_RESET);
-            response.addProperty(TYPE, REACTION);
-            response.addProperty(REACTION, true);
+            commandAdded = true;
+            System.out.println(Colors.ANSI_YELLOW + "RaftNode (" + Thread.currentThread().getName() + "): Added " + payload + " from " + sender + " to log" + Colors.ANSI_RESET);
+            try {
+                writeToDisk("receiveCommand");
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
 
-        try {
-            writeToDisk("receiveCommand");
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return response.toString();
+        return commandAdded ? response.toString() : "none";
     }
 
     synchronized public void receiveMessage(Message message) {
@@ -472,13 +466,60 @@ public class RaftNode {
             messageReplies.put(curMessage.getGuid(), retVal);
         }
         else if (curMessage.getType().equals(COMMAND)) {
-            retVal = receiveCommand(curMessage.getPayload(), curMessage.getSender());
+            retVal = receiveCommand(curMessage.getPayload(), curMessage.getSender(), curMessage.getGuid());
             System.out.println(Colors.ANSI_CYAN + "RaftNode (" + Thread.currentThread().getName() + "): message [" + curMessage.getGuid() + "] response: " + retVal + Colors.ANSI_RESET);
-            messageReplies.put(curMessage.getGuid(), retVal);
+
+            if (!retVal.equals("none")) {
+                messageReplies.put(curMessage.getGuid(), retVal);
+            }
         }
         else {
             System.out.println(Colors.ANSI_RED + "ERROR RaftNode (" + Thread.currentThread().getName() + "): UNSUPPORTED MESSAGE TYPE " + curMessage.getType() + Colors.ANSI_RESET);
         }
+    }
+
+    private void updateStateMachines() {
+
+
+        for (int i = lastApplied + 1; i <= commitIndex; i++) {
+            JsonObject currentCommand = new JsonParser().parse(logs.get(i).getCommand()).getAsJsonObject();
+            int robotActor = currentCommand.get(ROBOT_ID).getAsInt();
+            JsonObject response = new JsonObject();
+            response.addProperty(TYPE, REACTION);
+
+            if (!robotStates.containsKey(robotActor)) {
+                System.out.println(Colors.ANSI_RED + "WARNING RaftNode (" + Thread.currentThread().getName() + "): Attempting to update non-existent state machine for robot " + currentCommand.get(ROBOT_ID).getAsInt() + Colors.ANSI_RESET);
+            }
+            else {
+                String action = currentCommand.get(COMMAND).getAsString();
+
+                if (action.equals(StateMachine.PUNCH_LEFT) || action.equals(StateMachine.PUNCH_RIGHT)) {
+                    //get the id for the other state machine
+                    int otherRobot = 0;
+                    for (Integer robot : robotStates.keySet()) {
+                        if (!robot.equals(robotActor)) {
+                            otherRobot = robot;
+                            break;
+                        }
+                    }
+
+                    robotStates.get(robotActor).checkStates(action, robotStates.get(otherRobot).getState());
+                    if (robotStates.get(robotActor).getState().equals(StateMachine.WIN)) {
+                        robotStates.get(otherRobot).checkStates(StateMachine.LOST);
+                    }
+                }
+                else {
+                    robotStates.get(robotActor).checkStates(action);
+                    System.out.println("New robot state is " + robotStates.get(robotActor).getState());
+                }
+
+                response.addProperty(REACTION, robotStates.get(robotActor).getState());
+                System.out.println("Response: " + response.toString());
+                messageReplies.put(UUID.fromString(currentCommand.get("message_guid").getAsString()), response.toString());
+            }
+        }
+
+        lastApplied = commitIndex;
     }
 
     private void writeToDisk(String callingMethod) throws IOException {

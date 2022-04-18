@@ -1,7 +1,7 @@
 import java.util.UUID;
 
 public class Message {
-    private String type, payload, command;
+    private String type, payload;
     private int sender, destination, term;
     private UUID guid;
 

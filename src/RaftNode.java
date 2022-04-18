@@ -79,12 +79,10 @@ public class RaftNode {
                 //add an entry to the log on an average of 1 out of every 7 heartbeats
                 Random rand = new Random();
                 counter++;
-                HashMap<String, String> logsToDisk = new HashMap<>();
                 if (rand.nextInt(7) == 4) {
                     logs.add(new ReplicatedLog(term, "command #" + id + "-" + counter));
                     // write the disk
-                    logsToDisk.put("Command", logs.toString());
-                    writeToDisk(logs.toString());
+                    writeToDisk("testing_block");
                     System.out.println(Colors.ANSI_YELLOW + "RaftNode (" + Thread.currentThread().getName() + "): Added " + "command #" + id + "-" + counter + " to log" + Colors.ANSI_RESET);
                 }
                 //END TESTING BLOCK
@@ -128,12 +126,8 @@ public class RaftNode {
         // reset the term timer
         timer.reset();
 
-        HashMap<String, String> termVotedFor = new HashMap<>();
-        // write term, votedfor and log to disk
-        termVotedFor.put("term", this.term.toString());
-        termVotedFor.put("votedFor", this.votedFor.toString());
         try {
-            writeToDisk(termVotedFor.toString());
+            writeToDisk("startElection");
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -232,9 +226,6 @@ public class RaftNode {
     private String receiveAppendEntries(String payload) {
         JsonObject jsonObject = new JsonParser().parse(payload).getAsJsonObject();
         JsonObject response = new JsonObject();
-        HashMap<String, String>  diskInfo= new HashMap<>();
-        HashMap<String, String> termVotedFor = new HashMap<>();
-
 
         if (jsonObject.get(LEADER_TERM).getAsInt() < term) {            
             response.addProperty("result", false);
@@ -283,15 +274,8 @@ public class RaftNode {
             response.addProperty("newNextIndex", logs.size());
         }
 
-        // write the term, votedfor and log to disk
-        termVotedFor.put("term", this.term.toString());
-        termVotedFor.put("votedFor", this.votedFor.toString());
-
-        diskInfo.put("receiveAppendEntries", termVotedFor.toString());
-        diskInfo.put("reReceiveAppendEntries", response.toString());
-
         try {
-            writeToDisk(diskInfo.toString());
+            writeToDisk("receiveAppendEntries");
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -384,13 +368,9 @@ public class RaftNode {
         else {
             response.addProperty("result", false);
         }
-        //  write the new term, votedfor and log in the disk,
-        termVotedFor.put("term", this.term.toString());
-        termVotedFor.put("votedFor", this.votedFor.toString());
-        diskInfo.put("receiveRequestVote", termVotedFor.toString());
-        diskInfo.put("reReceiveRequestVote", response.toString());
+
         try {
-            writeToDisk(diskInfo.toString());
+            writeToDisk("receiveRequestVote");
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -412,10 +392,8 @@ public class RaftNode {
             response.addProperty("result", true);
         }
 
-        // write the log to disk. use the method name as the key
-        diskInfo.put("receiveCommand", response.toString());
         try {
-            writeToDisk(diskInfo.toString());
+            writeToDisk("receiveCommand");
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -500,11 +478,17 @@ public class RaftNode {
         }
     }
 
-    public void writeToDisk(String payload) throws IOException {
-        String fileName = "Node" + "_log.json";
-        BufferedWriter writer = new BufferedWriter(new FileWriter(fileName));
+    private void writeToDisk(String callingMethod) throws IOException {
+        JsonObject diskInfo = new JsonObject();
         Gson gson = new Gson();
-        writer.write(gson.toJson(payload));
+
+        diskInfo.addProperty("callingMethod", callingMethod);
+        diskInfo.addProperty("term", term);
+        diskInfo.addProperty("votedFor", votedFor);
+        diskInfo.addProperty("logs", gson.toJson(logs));
+        String fileName = "Node_" + id + "_log.json";
+        BufferedWriter writer = new BufferedWriter(new FileWriter(fileName));
+        writer.write(diskInfo.toString());
         writer.close();
     }
 

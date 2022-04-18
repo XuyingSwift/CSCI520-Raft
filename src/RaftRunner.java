@@ -5,9 +5,9 @@ import java.util.HashMap;
 import java.util.Scanner;
 
 public class RaftRunner {
-    public final static int SLOW_FACTOR = 1;
+    public final static int SLOW_FACTOR = 15;
 
-    public static void main(String[] args, String[] robotArgs) {
+    public static void main(String[] args) {
         //config string format: "0 0 127.0.0.1 5000 1 127.0.0.1 5001 2 127.0.0.1 5002", ...
         int id = Integer.parseInt(args[0]);
         HashMap<Integer, RemoteNode> remoteNodes = buildRemoteList(args);

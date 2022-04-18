@@ -1,9 +1,7 @@
 import com.google.gson.*;
 import com.google.gson.reflect.TypeToken;
 
-import java.io.BufferedWriter;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
 import java.util.*;
 
 public class RaftNode {
@@ -491,6 +489,28 @@ public class RaftNode {
         writer.write(diskInfo.toString());
         writer.close();
     }
+    
+    public void restoreStateFromFile() {
+        String fileName = "Node_" + id + "_log.json";
+        Reader fileReader;
 
-    //TODO: read in node state from the disk so it can restore
+        try {
+            fileReader = new FileReader(fileName);
+            JsonObject jsonObject = new JsonParser().parse(fileReader).getAsJsonObject();
+
+            term = jsonObject.get("term").getAsInt();
+            votedFor = jsonObject.get("votedFor").getAsInt();
+
+            TypeToken<List<ReplicatedLog>> token = new TypeToken<>() {};
+            Gson gson = new Gson();
+            logs = gson.fromJson(jsonObject.get("logs").getAsString(), token.getType());
+
+            System.out.println(Colors.ANSI_WHITE + "-----Restored State From Disk-----" + Colors.ANSI_RESET);
+            System.out.println(Colors.ANSI_WHITE + "Term: " + term + Colors.ANSI_RESET);
+            System.out.println(Colors.ANSI_WHITE + "Voted For: " + votedFor + Colors.ANSI_RESET);
+            System.out.println(Colors.ANSI_WHITE + "Log Entries: " + logs.size() + Colors.ANSI_RESET);
+        } catch (FileNotFoundException e) {
+            System.out.println("State file not found, starting from empty state...");
+        }
+    }
 }

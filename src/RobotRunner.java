@@ -10,18 +10,6 @@ public class RobotRunner {
         HashMap<Integer, RemoteNode> remoteNodes = buildRemoteList(args);
 
         BufferedReader input = new BufferedReader(new InputStreamReader(System.in));
-        System.out.println("Press <enter> to continue...");
-        try {
-            input.readLine();
-            System.out.print("Starting in ");
-            for (int i = 7; i >= 1; i--) {
-                System.out.print(i + "..");
-                Thread.sleep(1000);
-            }
-            System.out.print(System.lineSeparator());
-        } catch (IOException | InterruptedException e) {
-            e.printStackTrace();
-        }
 
         String name = null;
         System.out.println("Please enter a name for your robot: ");

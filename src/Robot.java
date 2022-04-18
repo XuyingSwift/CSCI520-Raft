@@ -77,13 +77,28 @@ public class Robot {
 
                     msg = socketIn.readLine();
                 }
-                jsonObject = new JsonParser().parse(response).getAsJsonObject();
-                if (jsonObject.get(RaftNode.TYPE).equals(RaftNode.REDIRECT)) {
-                    this.targetNode = jsonObject.get(RaftNode.CURRENT_LEADER).getAsInt();
-                }
+
                 socketIn.close();
                 socketOut.close();
                 socket.close();
+
+                jsonObject = new JsonParser().parse(response).getAsJsonObject();
+
+                if (jsonObject.get(RaftNode.TYPE).equals(RaftNode.REDIRECT)) {
+                    String newLeader = jsonObject.get(RaftNode.CURRENT_LEADER).getAsString();
+                    if (newLeader.equals("none")) {
+                        Random rand = new Random();
+                        targetNode = rand.nextInt(remoteNodes.size()); //try again with a random node
+                        try { //give the raft nodes a pause to pick a new leader
+                            Thread.sleep(500);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                    else {
+                        targetNode = Integer.parseInt(newLeader);
+                    }
+                }
             } catch (IOException e) {
                 e.printStackTrace();
             }

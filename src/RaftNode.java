@@ -430,7 +430,14 @@ public class RaftNode {
                 // make a response for the robot and send it back
                 JsonObject jsonObject = new JsonObject();
                 jsonObject.addProperty(TYPE, REDIRECT);
-                jsonObject.addProperty(CURRENT_LEADER, this.currentLeader);
+
+                if (currentLeader == null) {
+                    jsonObject.addProperty(CURRENT_LEADER, "none");
+                }
+                else {
+                    jsonObject.addProperty(CURRENT_LEADER, currentLeader);
+                }
+
                 this.messageReplies.put(message.getGuid(), jsonObject.toString());
             }
         } else {

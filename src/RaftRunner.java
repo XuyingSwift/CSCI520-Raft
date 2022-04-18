@@ -11,6 +11,7 @@ public class RaftRunner {
         //config string format: "0 0 127.0.0.1 5000 1 127.0.0.1 5001 2 127.0.0.1 5002", ...
         int id = Integer.parseInt(args[0]);
         HashMap<Integer, RemoteNode> remoteNodes = buildRemoteList(args);
+        System.out.println("My id");
         int port = remoteNodes.get(id).getPort();
 
         RaftNode node = new RaftNode(id, port, remoteNodes);

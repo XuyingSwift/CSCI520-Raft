@@ -104,6 +104,13 @@ public class Robot {
                     }
                 }
             } catch (IOException e) {
+                Random rand = new Random();
+                targetNode = rand.nextInt(remoteNodes.size()); //try again with a random node
+                try { //give the raft nodes a pause to pick a new leader
+                    Thread.sleep(500);
+                } catch (InterruptedException exception) {
+                    exception.printStackTrace();
+                }
                 e.printStackTrace();
             }
         }

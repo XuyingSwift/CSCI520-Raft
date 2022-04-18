@@ -7,19 +7,20 @@ import java.util.Scanner;
 public class RaftRunner {
     public final static int SLOW_FACTOR = 15;
 
-    public static void main(String[] args) {
+    public static void main(String[] args, String[] robotArgs) {
         //config string format: "0 0 127.0.0.1 5000 1 127.0.0.1 5001 2 127.0.0.1 5002", ...
         int id = Integer.parseInt(args[0]);
         HashMap<Integer, RemoteNode> remoteNodes = buildRemoteList(args);
         int port = remoteNodes.get(id).getPort();
 
         RaftNode node = new RaftNode(id, port, remoteNodes);
+
         //TODO: restore node state
         // if the file is not null, then I read in that restore, delete that file, restart from scratch
-        BufferedReader inputB = new BufferedReader(new InputStreamReader(System.in));
+        BufferedReader input = new BufferedReader(new InputStreamReader(System.in));
         System.out.println("Press <enter> to continue...");
         try {
-            inputB.readLine();
+            input.readLine();
             System.out.print("Starting in ");
             for (int i = 7; i >= 1; i--) {
                 System.out.print(i + "..");
@@ -43,7 +44,7 @@ public class RaftRunner {
 
         System.out.println("Press <enter> to quit...");
         try {
-            inputB.readLine();
+            input.readLine();
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -60,6 +61,24 @@ public class RaftRunner {
     }
 
     private static HashMap<Integer, RemoteNode> buildRemoteList(String[] config) {
+        HashMap<Integer, RemoteNode> remotes = new HashMap<>();
+
+        int idx = 1;
+        while (idx < config.length) {
+            int curId = Integer.parseInt(config[idx]);
+            idx++;
+            String curAddress = config[idx];
+            idx++;
+            int curPort = Integer.parseInt(config[idx]);
+            idx++;
+
+            remotes.put(curId, new RemoteNode(curId, curAddress, curPort));
+        }
+
+        return remotes;
+    }
+
+    private static HashMap<Integer, RemoteNode> buildRemoteRobotList(String[] config) {
         HashMap<Integer, RemoteNode> remotes = new HashMap<>();
 
         int idx = 1;

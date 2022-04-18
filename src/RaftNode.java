@@ -11,8 +11,9 @@ public class RaftNode {
             CANDIDATE_ID = "candidateId", CANDIDATE_TERM = "candidateTerm",
             LEADER_TERM = "leaderTerm", LEADER_ID = "leaderId",
             PREV_LOG_INDEX = "prevLogIndex", PREV_LOG_TERM = "prevLogTerm", ENTRIES = "entries", LEADER_COMMIT = "leaderCommit",
-            LAST_LOG_INDEX = "lastLogIndex", LAST_LOG_TERM = "lastLogTerm";
+            LAST_LOG_INDEX = "lastLogIndex", LAST_LOG_TERM = "lastLogTerm", CURRENT_LEADER = "current leader";
     private final String FOLLOW = "FOLLOWER", CANDID = "CANDIDATE", LEADER = "LEADER";
+    public static final String REDIRECT = "redirect", REACTION = "reaction", TYPE = "type";
 
     private final int HEARTBEAT_TIME = 50 * RaftRunner.SLOW_FACTOR, MAJORITY;
     private int port, id;
@@ -422,29 +423,41 @@ public class RaftNode {
     }
 
     synchronized public void receiveMessage(Message message) {
-        if (message == null) {
-            System.out.println(Colors.ANSI_RED + ">>>WARNING RaftNode (" + Thread.currentThread().getName() + "): putting NULL message on queue" + Colors.ANSI_RESET);
-        }
-
-        if (message.getType().equals(REQ_VOTE) && (message.getTerm() > term || (message.getTerm() >= term && votedFor.equals(message.getSender())))) {
-            timer.reset();
-        }
-
-        if (message.getTerm() >= term && message.getType().equals(APPEND)) {
-            timer.reset();
-            currentLeader = message.getSender();
-        }
-
-        if (message.getTerm() > term) {
-            if (!state.equals(FOLLOW)) {
-                System.out.println(Colors.ANSI_YELLOW + "RaftNode (" + Thread.currentThread().getName() + "): switching to follower, new term " + message.getTerm() + " from node " + message.getSender() + " greater than my term " + term + Colors.ANSI_RESET);
+        if (message.getType().equals(COMMAND)) {
+            if (this.state.equals(LEADER)) {
+                messageQueue.add(message);
+            } else {
+                // make a response for the robot and send it back
+                JsonObject jsonObject = new JsonObject();
+                jsonObject.addProperty(TYPE, REDIRECT);
+                jsonObject.addProperty(CURRENT_LEADER, this.currentLeader);
+                this.messageReplies.put(message.getGuid(), jsonObject.toString());
             }
-            state = FOLLOW;
-            term = message.getTerm();
-            votedFor = -1;
-        }
+        } else {
+            if (message == null) {
+                System.out.println(Colors.ANSI_RED + ">>>WARNING RaftNode (" + Thread.currentThread().getName() + "): putting NULL message on queue" + Colors.ANSI_RESET);
+            }
 
-        messageQueue.add(message);
+            if (message.getType().equals(REQ_VOTE) && (message.getTerm() > term || (message.getTerm() >= term && votedFor.equals(message.getSender())))) {
+                timer.reset();
+            }
+
+            if (message.getTerm() >= term && message.getType().equals(APPEND)) {
+                timer.reset();
+                currentLeader = message.getSender();
+            }
+
+            if (message.getTerm() > term) {
+                if (!state.equals(FOLLOW)) {
+                    System.out.println(Colors.ANSI_YELLOW + "RaftNode (" + Thread.currentThread().getName() + "): switching to follower, new term " + message.getTerm() + " from node " + message.getSender() + " greater than my term " + term + Colors.ANSI_RESET);
+                }
+                state = FOLLOW;
+                term = message.getTerm();
+                votedFor = -1;
+            }
+
+            messageQueue.add(message);
+        }
     }
 
     public synchronized HashMap<UUID, String> getMessageReplies() {

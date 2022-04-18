@@ -1,4 +1,6 @@
 import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -10,19 +12,19 @@ import java.util.*;
 // we need socket programming
 public class Robot {
     private String name;
-    private int targetNode;
+    private int targetNode, id;
     private HashMap<Integer, RemoteNode> remoteNodes;
     public static final String BLOCK_RIGHT = "block with right hand", BLOCK_LEFT = "block with left hand",
-             LOST = "lost", PUNCH_RIGHT = "punch with right hand", PUNCH_LEFT = "punch left with hand",
+            LOST = "lost", PUNCH_RIGHT = "punch with right hand", PUNCH_LEFT = "punch left with hand",
             BLOCKED = "blocked";
-            ;
     private String state;
 
-    public Robot (String name, int targetNode, HashMap<Integer, RemoteNode> remoteNodes) {
+    public Robot (String name, int id, HashMap<Integer, RemoteNode> remoteNodes) {
         this.name = name;
         this.state = null;
-        this.targetNode = targetNode;
         this.remoteNodes = remoteNodes;
+        this.id = id;
+        this.targetNode = 0;
     }
 
     public void sendAction(int selection) {
@@ -49,72 +51,49 @@ public class Robot {
 
     public boolean sendMessage(String action) {
         System.out.println( this.name + " Sending message to node " + this.targetNode);
-        try {
-            Socket socket = new Socket(this.remoteNodes.get(this.targetNode).getAddress(), this.remoteNodes.get(this.targetNode).getPort());
-            System.out.println(this.name + "made connection with " + this.targetNode);
-            PrintStream socketOut = new PrintStream(socket.getOutputStream());
-            BufferedReader socketIn = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            // to send out the punch action you can only send out once a second
-            socketOut.println(action);
-            socketOut.println();
+        String response = null;
+        JsonObject jsonObject = null;
 
-            for (String resp = socketIn.readLine(); resp != null; resp = socketIn.readLine()) {
-                String reply = resp;
-                System.out.println("returning message from the node"  + resp);
-                checkStates(reply);
+        while (jsonObject == null || jsonObject.get(RaftNode.TYPE).equals(RaftNode.REDIRECT)) {
+            try {
+                Socket socket = new Socket(this.remoteNodes.get(this.targetNode).getAddress(), this.remoteNodes.get(this.targetNode).getPort());
+                System.out.println(this.name + "made connection with " + this.targetNode);
+                PrintStream socketOut = new PrintStream(socket.getOutputStream());
+                BufferedReader socketIn = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                // to send out the punch action you can only send out once a second
+                // send out Json part
+                Gson gson = new Gson();
+                HashMap<String, String> actionInfo = new HashMap<>();
+                actionInfo.put(RaftNode.COMMAND, action);
+                String actionMessage = gson.toJson(actionInfo);
+                Message message = new Message(this.id, RaftNode.COMMAND, actionMessage);
+                String messageJson = gson.toJson(message);
+                socketOut.println(messageJson);
+                socketOut.println();
+                String msg = socketIn.readLine();
+                while(msg != null && msg.length() > 0) {
+                    if (response == null) response = msg;
+                    else response += msg;
+
+                    msg = socketIn.readLine();
+                }
+                jsonObject = new JsonParser().parse(response).getAsJsonObject();
+                if (jsonObject.get(RaftNode.TYPE).equals(RaftNode.REDIRECT)) {
+                    this.targetNode = jsonObject.get(RaftNode.CURRENT_LEADER).getAsInt();
+                }
+                socketIn.close();
+                socketOut.close();
+                socket.close();
+            } catch (IOException e) {
+                e.printStackTrace();
             }
-            socketIn.close();
-            socketOut.close();
-            socket.close();
-        } catch (IOException e) {
-            e.printStackTrace();
         }
+
+
         return true;
     }
 
-    public void checkStates(String reply) {
-        Random rand = new Random();
-        int int_random = rand.nextInt(100);
-        // replay is punch with left
-        if (reply.equals(PUNCH_LEFT)) {
-            if (this.state != BLOCK_RIGHT) {
-                // here we check the 10% chance
-                // KO. robot is knocked out
-                if (int_random < 10) {
-                    this.state = LOST;
-                    System.out.println(this.name + " is Lost");
-                    System.out.println("GAME OVER");
-                    System.out.println("Do you want to restart a game?");
-                    // if yes, then restart the game
-                    displayMenu();
-                }
-            }else {
-                this.state = BLOCKED;
-                sendMessage(BLOCKED);
-            }
-        }
 
-        if (reply.equals(PUNCH_RIGHT)) {
-            // replay is punch with right hand
-            if (this.state != BLOCK_LEFT) {
-                if (int_random < 10) {
-                    this.state = LOST;
-                    System.out.println(this.name + " is Lost");
-                    System.out.println("GAME OVER");
-                    System.out.println("Do you want to restart a game?");
-                    displayMenu();
-                    // if yes, then restart the game
-                }
-            }else {
-                this.state = BLOCKED;
-                sendMessage(BLOCKED);
-            }
-        }
-
-        if (reply.equals(BLOCKED)) {
-            //  make the robot sleep for 3 second.
-        }
-    }
     public void punchRight() {
         System.out.println(this.name + " punched with right hand ");
         // method to send to leader

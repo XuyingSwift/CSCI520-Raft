@@ -1,8 +1,10 @@
 echo -n "Enter Robot ID: "
 read robotId
+echo -n "Enter Robot port: "
+read robotPort
 
 configStr="0 18.212.28.37 4000 1 52.207.209.55 4000 2 44.204.63.193 4000 3 18.118.51.255 4000 4 54.219.59.46 4000"
-args="$robotId $configStr"
+args="$robotId $robotPort $configStr"
 echo $args
 
 

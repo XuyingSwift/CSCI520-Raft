@@ -491,6 +491,7 @@ public class RaftNode {
     }
 
     private void updateStateMachines() {
+        // see the action is commited or not
         for (int i = lastApplied + 1; i <= commitIndex; i++) {
             JsonObject currentCommand = new JsonParser().parse(logs.get(i).getCommand()).getAsJsonObject();
             int robotActor = currentCommand.get(ROBOT_ID).getAsInt();
@@ -527,6 +528,29 @@ public class RaftNode {
                     robotStates.get(robotActor).checkStates(action, robotStates.get(otherRobot).getState());
                     if (robotStates.get(robotActor).getState().equals(StateMachine.WIN)) {
                         robotStates.get(otherRobot).checkStates(StateMachine.LOST);
+                        //TODO: if leader, put "win" event for winning robot and "KO" event for losing robot in log
+                        //TODO: figure out how to sen
+                        // d "KO" message to losing robot
+                        if (this.state.equals(LEADER)) {
+                            // robot actor send the leader punch left
+                            // the leader will put the punch to the log and replicate the log
+                            // the leader will find the punch is commited or not
+                            // after the punch is committed, then the leader will apply the state machine
+
+                            // log size 5, commit index 4, leader knows of majority of the nodes have up to index 4 in their log,
+                            // at leader my last applied number is 2, from last applied to 4, apply these actions to the state machine
+                            JsonObject object = new JsonObject();
+                            object.addProperty(ROBOT_ID, robotActor);
+                            object.addProperty(COMMAND, StateMachine.WIN);
+                            ReplicatedLog  winCommand = new ReplicatedLog(this.term, object.toString());
+                            this.logs.add(winCommand);
+
+                            JsonObject lostObject = new JsonObject();
+                            lostObject.addProperty(ROBOT_ID, otherRobot);
+                            lostObject.addProperty(COMMAND, StateMachine.LOST);
+                            ReplicatedLog lostCommand  = new ReplicatedLog(this.term, lostObject.toString());
+                            this.logs.add(lostCommand);
+                        }
                     }
                 }
                 else {

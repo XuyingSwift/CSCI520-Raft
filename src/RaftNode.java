@@ -22,6 +22,7 @@ public class RaftNode {
 
     volatile private ArrayList<ReplicatedLog> logs;
     private int lastApplied;
+    private ForceTimeout forceTimeout;
 
     volatile private int[] nextIndex, matchIndex;
     volatile private ElectionTimer timer;
@@ -51,6 +52,7 @@ public class RaftNode {
         lastApplied = -1;
         robotStates = new HashMap<>();
         robotAddresses = new HashMap<>();
+        forceTimeout = new ForceTimeout();
     }
 
     public void run() throws IOException {
@@ -65,13 +67,19 @@ public class RaftNode {
          *      reset election timer
          *      send requestVote to everyone else
          */
+
+        forceTimeout.start();
         timer.start();
         long lastHeartbeat = System.nanoTime();
 
-        int counter = 0; //FOR TESTING ONLY
         while (true) {
             if (state.equals(CANDID) && voteCount >= MAJORITY) {
                 becomeLeader();
+            }
+
+            if (forceTimeout.isTimeoutForced()) {
+                forceTimeout.reset();
+                startElection();
             }
 
             if (state.equals(LEADER) && ((System.nanoTime() - lastHeartbeat) / 1000000) >= HEARTBEAT_TIME) {

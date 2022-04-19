@@ -7,7 +7,9 @@ public class RobotRunner {
     public static void main(String[] args) {
         //config string format: "0 0 127.0.0.1 5000 1 127.0.0.1 5001 2 127.0.0.1 5002", ...
         int id = Integer.parseInt(args[0]);
+        int port = Integer.parseInt(args[1]);
         HashMap<Integer, RemoteNode> remoteNodes = buildRemoteList(args);
+        RobotServer robotServer = new RobotServer(port);
 
         BufferedReader input = new BufferedReader(new InputStreamReader(System.in));
 
@@ -19,7 +21,8 @@ public class RobotRunner {
             e.printStackTrace();
         }
 
-        Robot robot = new Robot(name, id, remoteNodes);
+        Robot robot = new Robot(name, id, remoteNodes, port);
+        robotServer.start();
         int selection = -1;
 
         while (selection != 0) {
@@ -37,7 +40,7 @@ public class RobotRunner {
     private static HashMap<Integer, RemoteNode> buildRemoteList(String[] config) {
         HashMap<Integer, RemoteNode> remotes = new HashMap<>();
 
-        int idx = 1;
+        int idx = 2;
         while (idx < config.length) {
             int curId = Integer.parseInt(config[idx]);
             idx++;

@@ -22,6 +22,7 @@ public class RaftNode {
 
     volatile private ArrayList<ReplicatedLog> logs;
     private int lastApplied;
+    private ForceTimeout forceTimeout;
 
     volatile private int[] nextIndex, matchIndex;
     volatile private ElectionTimer timer;
@@ -51,6 +52,7 @@ public class RaftNode {
         lastApplied = -1;
         robotStates = new HashMap<>();
         robotAddresses = new HashMap<>();
+        forceTimeout = new ForceTimeout();
     }
 
     public void run() throws IOException {
@@ -65,13 +67,19 @@ public class RaftNode {
          *      reset election timer
          *      send requestVote to everyone else
          */
+
+        forceTimeout.start();
         timer.start();
         long lastHeartbeat = System.nanoTime();
 
-        int counter = 0; //FOR TESTING ONLY
         while (true) {
             if (state.equals(CANDID) && voteCount >= MAJORITY) {
                 becomeLeader();
+            }
+
+            if (forceTimeout.isTimeoutForced()) {
+                forceTimeout.reset();
+                startElection();
             }
 
             if (state.equals(LEADER) && ((System.nanoTime() - lastHeartbeat) / 1000000) >= HEARTBEAT_TIME) {
@@ -483,6 +491,7 @@ public class RaftNode {
     }
 
     private void updateStateMachines() {
+        // see the action is commited or not
         for (int i = lastApplied + 1; i <= commitIndex; i++) {
             JsonObject currentCommand = new JsonParser().parse(logs.get(i).getCommand()).getAsJsonObject();
             int robotActor = currentCommand.get(ROBOT_ID).getAsInt();
@@ -520,7 +529,38 @@ public class RaftNode {
                     if (robotStates.get(robotActor).getState().equals(StateMachine.WIN)) {
                         robotStates.get(otherRobot).checkStates(StateMachine.LOST);
                         //TODO: if leader, put "win" event for winning robot and "KO" event for losing robot in log
-                        //TODO: figure out how to send "KO" message to losing robot
+                        //TODO: figure out how to sen
+                        // d "KO" message to losing robot
+                        if (this.state.equals(LEADER)) {
+                            // robot actor send the leader punch left
+                            // the leader will put the punch to the log and replicate the log
+                            // the leader will find the punch is commited or not
+                            // after the punch is committed, then the leader will apply the state machine
+
+                            // log size 5, commit index 4, leader knows of majority of the nodes have up to index 4 in their log,
+                            // at leader my last applied number is 2, from last applied to 4, apply these actions to the state machine
+                            JsonObject object = new JsonObject();
+                            object.addProperty(ROBOT_ID, robotActor);
+                            object.addProperty(COMMAND, StateMachine.WIN);
+                            ReplicatedLog  winCommand = new ReplicatedLog(this.term, object.toString());
+                            this.logs.add(winCommand);
+
+                            JsonObject lostObject = new JsonObject();
+                            lostObject.addProperty(ROBOT_ID, otherRobot);
+                            lostObject.addProperty(COMMAND, StateMachine.LOST);
+                            ReplicatedLog lostCommand  = new ReplicatedLog(this.term, lostObject.toString());
+                            this.logs.add(lostCommand);
+
+                            try {
+                                writeToDisk("updateStateMachines");
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
+
+                            Message lostMessage = new Message(id, otherRobot, term, REACTION, lostObject.toString());
+                            RobotClient robotClient = new RobotClient(robotAddresses.get(otherRobot)[0], Integer.parseInt(robotAddresses.get(otherRobot)[1]), lostMessage);
+                            robotClient.sendMessage();
+                        }
                     }
                 }
                 else {
@@ -530,7 +570,10 @@ public class RaftNode {
 
                 response.addProperty(REACTION, robotStates.get(robotActor).getState());
                 System.out.println("Response: " + response.toString());
-                messageReplies.put(UUID.fromString(currentCommand.get("message_guid").getAsString()), response.toString());
+
+                if (currentCommand.has("message_guid")) {
+                    messageReplies.put(UUID.fromString(currentCommand.get("message_guid").getAsString()), response.toString());
+                }
             }
         }
 

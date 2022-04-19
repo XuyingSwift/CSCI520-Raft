@@ -29,7 +29,7 @@ public class StateMachine {
             if (!opponentState.equals(BLOCK_RIGHT)) {
                 // here we check the 10% chance
                 // KO. robot is knocked out
-                if (int_random < 10) {
+                if (int_random < 30) {
                     this.state = WIN;
                 }
             }else {
@@ -41,7 +41,7 @@ public class StateMachine {
             // replay is punch with right hand
             this.state = PUNCH_RIGHT;
             if (!opponentState.equals(BLOCK_LEFT)) {
-                if (int_random < 10) {
+                if (int_random < 30) {
                     this.state = WIN;
                 }
             }else {

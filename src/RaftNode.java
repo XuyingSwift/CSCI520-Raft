@@ -550,6 +550,16 @@ public class RaftNode {
                             lostObject.addProperty(COMMAND, StateMachine.LOST);
                             ReplicatedLog lostCommand  = new ReplicatedLog(this.term, lostObject.toString());
                             this.logs.add(lostCommand);
+
+                            try {
+                                writeToDisk("updateStateMachines");
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
+
+                            Message lostMessage = new Message(id, otherRobot, term, REACTION, lostObject.toString());
+                            RobotClient robotClient = new RobotClient(robotAddresses.get(otherRobot)[0], Integer.parseInt(robotAddresses.get(otherRobot)[1]), lostMessage);
+                            robotClient.sendMessage();
                         }
                     }
                 }
@@ -560,7 +570,10 @@ public class RaftNode {
 
                 response.addProperty(REACTION, robotStates.get(robotActor).getState());
                 System.out.println("Response: " + response.toString());
-                messageReplies.put(UUID.fromString(currentCommand.get("message_guid").getAsString()), response.toString());
+
+                if (currentCommand.has("message_guid")) {
+                    messageReplies.put(UUID.fromString(currentCommand.get("message_guid").getAsString()), response.toString());
+                }
             }
         }
 

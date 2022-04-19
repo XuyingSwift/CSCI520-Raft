@@ -44,7 +44,7 @@ public class MessagePasser extends Thread{
                 if (jsonPayload.get(RaftNode.COMMAND).getAsString().equals(Robot.START)) {
                     JsonObject addressInfo = new JsonObject();
                     addressInfo.addProperty("address", socket.getInetAddress().toString());
-                    addressInfo.addProperty("port", socket.getPort());
+                    addressInfo.addProperty("port", jsonPayload.get("myPort").getAsString());
 
                     jsonPayload.add("addressInfo", addressInfo);
                     message.setPayload(jsonPayload.toString());

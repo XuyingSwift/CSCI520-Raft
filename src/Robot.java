@@ -12,19 +12,20 @@ import java.util.*;
 // we need socket programming
 public class Robot {
     private String name;
-    private int targetNode, id;
+    private int targetNode, id, port;
     private HashMap<Integer, RemoteNode> remoteNodes;
     public static final String BLOCK_RIGHT = "block with right hand", BLOCK_LEFT = "block with left hand",
             LOST = "lost", PUNCH_RIGHT = "punch with right hand", PUNCH_LEFT = "punch left with hand",
             BLOCKED = "blocked", START = "start";
     private String state;
 
-    public Robot (String name, int id, HashMap<Integer, RemoteNode> remoteNodes) {
+    public Robot (String name, int id, HashMap<Integer, RemoteNode> remoteNodes, int port) {
         this.name = name;
         this.state = null;
         this.remoteNodes = remoteNodes;
         this.id = id;
         this.targetNode = 0;
+        this.port = port;
         sendMessage(START);
     }
 
@@ -67,6 +68,7 @@ public class Robot {
                 HashMap<String, String> actionInfo = new HashMap<>();
                 actionInfo.put(RaftNode.COMMAND, action);
                 actionInfo.put(RaftNode.ROBOT_ID, String.valueOf(id));
+                if (action.equals(START)) actionInfo.put("myPort", String.valueOf(port));
                 String actionMessage = gson.toJson(actionInfo);
                 Message message = new Message(this.id, RaftNode.COMMAND, actionMessage);
                 String messageJson = gson.toJson(message);
@@ -105,11 +107,19 @@ public class Robot {
                         targetNode = Integer.parseInt(newLeader);
                     }
                 }
+
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
 
+        if (jsonObject.get(RaftNode.TYPE).getAsString().equals(RaftNode.REACTION)) {
+            System.out.println("New state is: " + jsonObject.get(RaftNode.REACTION).getAsString());
+
+            if (jsonObject.get(RaftNode.REACTION).getAsString().equals(StateMachine.WIN)) {
+                System.out.println(Colors.ANSI_YELLOW + "You knocked out the other robot!!! You WIN!" + Colors.ANSI_RESET);
+            }
+        }
 
         return true;
     }

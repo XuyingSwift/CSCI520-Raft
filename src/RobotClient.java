@@ -13,7 +13,7 @@ public class RobotClient {
     private Message message;
 
     public RobotClient(String address, int port, Message message) {
-        this.address = address;
+        this.address = address.substring(1);
         this.port = port;
         this.message = message;
     }
@@ -21,6 +21,7 @@ public class RobotClient {
     public void sendMessage() {
         String response = null;
         try {
+            System.out.println(this.address + ":" + this.port);
             Socket socket = new Socket(address, port);
             System.out.println(Colors.ANSI_GREEN + "Client (" + Thread.currentThread().getName() + "): Connection made to " + address + ":" + port + Colors.ANSI_RESET);
 

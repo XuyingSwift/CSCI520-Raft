@@ -519,6 +519,8 @@ public class RaftNode {
                     robotStates.get(robotActor).checkStates(action, robotStates.get(otherRobot).getState());
                     if (robotStates.get(robotActor).getState().equals(StateMachine.WIN)) {
                         robotStates.get(otherRobot).checkStates(StateMachine.LOST);
+                        //TODO: if leader, put "win" event for winning robot and "KO" event for losing robot in log
+                        //TODO: figure out how to send "KO" message to losing robot
                     }
                 }
                 else {

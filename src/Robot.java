@@ -127,7 +127,7 @@ public class Robot {
 
     public void blockRight() {
         System.out.println(this.name + " blocked with right hand");
-        sendMessage(BLOCK_LEFT);
+        sendMessage(BLOCK_RIGHT);
     }
 
     public void blockLeft() {

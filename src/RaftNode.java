@@ -394,7 +394,7 @@ public class RaftNode {
             }
         }
 
-        return commandAdded ? response.toString() : "none";
+        return !(commandAdded) ? response.toString() : "wait";
     }
 
     synchronized public void receiveMessage(Message message) {
@@ -469,7 +469,7 @@ public class RaftNode {
             retVal = receiveCommand(curMessage.getPayload(), curMessage.getSender(), curMessage.getGuid());
             System.out.println(Colors.ANSI_CYAN + "RaftNode (" + Thread.currentThread().getName() + "): message [" + curMessage.getGuid() + "] response: " + retVal + Colors.ANSI_RESET);
 
-            if (!retVal.equals("none")) {
+            if (!retVal.equals("wait")) {
                 messageReplies.put(curMessage.getGuid(), retVal);
             }
         }
@@ -479,8 +479,6 @@ public class RaftNode {
     }
 
     private void updateStateMachines() {
-
-
         for (int i = lastApplied + 1; i <= commitIndex; i++) {
             JsonObject currentCommand = new JsonParser().parse(logs.get(i).getCommand()).getAsJsonObject();
             int robotActor = currentCommand.get(ROBOT_ID).getAsInt();
@@ -502,7 +500,7 @@ public class RaftNode {
                             break;
                         }
                     }
-
+                    
                     robotStates.get(robotActor).checkStates(action, robotStates.get(otherRobot).getState());
                     if (robotStates.get(robotActor).getState().equals(StateMachine.WIN)) {
                         robotStates.get(otherRobot).checkStates(StateMachine.LOST);

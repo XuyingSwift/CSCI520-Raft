@@ -26,7 +26,7 @@ public class StateMachine {
         // replay is punch with left
         if (command.equals(PUNCH_LEFT)) {
             this.state = PUNCH_LEFT;
-            if (opponentState != BLOCK_RIGHT) {
+            if (!opponentState.equals(BLOCK_RIGHT)) {
                 // here we check the 10% chance
                 // KO. robot is knocked out
                 if (int_random < 10) {
@@ -40,7 +40,7 @@ public class StateMachine {
         if (command.equals(PUNCH_RIGHT)) {
             // replay is punch with right hand
             this.state = PUNCH_RIGHT;
-            if (opponentState != BLOCK_LEFT) {
+            if (!opponentState.equals(BLOCK_LEFT)) {
                 if (int_random < 10) {
                     this.state = WIN;
                 }

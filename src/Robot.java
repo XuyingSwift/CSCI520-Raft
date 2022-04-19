@@ -16,7 +16,7 @@ public class Robot {
     private HashMap<Integer, RemoteNode> remoteNodes;
     public static final String BLOCK_RIGHT = "block with right hand", BLOCK_LEFT = "block with left hand",
             LOST = "lost", PUNCH_RIGHT = "punch with right hand", PUNCH_LEFT = "punch left with hand",
-            BLOCKED = "blocked";
+            BLOCKED = "blocked", START = "start";
     private String state;
 
     public Robot (String name, int id, HashMap<Integer, RemoteNode> remoteNodes) {
@@ -25,6 +25,7 @@ public class Robot {
         this.remoteNodes = remoteNodes;
         this.id = id;
         this.targetNode = 0;
+        sendMessage(START);
     }
 
     public void sendAction(int selection) {

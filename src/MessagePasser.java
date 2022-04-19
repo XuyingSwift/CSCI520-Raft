@@ -1,10 +1,13 @@
 import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.net.Socket;
+import java.util.HashMap;
 
 public class MessagePasser extends Thread{
     private Socket socket;
@@ -34,6 +37,21 @@ public class MessagePasser extends Thread{
 
             Gson gson = new Gson();
             Message message = gson.fromJson(messageJson, Message.class);
+
+            //hacky code here
+            if (message.getType().equals(RaftNode.COMMAND)) {
+                JsonObject jsonPayload = new JsonParser().parse(message.getPayload()).getAsJsonObject();
+                if (jsonPayload.get(RaftNode.COMMAND).getAsString().equals(Robot.START)) {
+                    JsonObject addressInfo = new JsonObject();
+                    addressInfo.addProperty("address", socket.getInetAddress().toString());
+                    addressInfo.addProperty("port", socket.getPort());
+
+                    jsonPayload.add("addressInfo", addressInfo);
+                    message.setPayload(jsonPayload.toString());
+                }
+            }
+            //end
+
             node.receiveMessage(message);
 
             System.out.println(Colors.ANSI_PURPLE + "MessagePasser (" + Thread.currentThread().getName() + "): Added " + message.getType() + " message [" + message.getGuid() + "] from " + message.getSender() + " to queue, waiting for response..." + Colors.ANSI_RESET);

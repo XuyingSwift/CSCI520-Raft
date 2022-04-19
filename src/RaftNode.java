@@ -18,6 +18,7 @@ public class RaftNode {
 
     private HashMap<Integer, RemoteNode> remoteNodes;
     private HashMap<Integer, StateMachine> robotStates;
+    private HashMap<Integer, String[]> robotAddresses;
 
     volatile private ArrayList<ReplicatedLog> logs;
     private int lastApplied;
@@ -49,6 +50,7 @@ public class RaftNode {
         votedFor = -1;
         lastApplied = -1;
         robotStates = new HashMap<>();
+        robotAddresses = new HashMap<>();
     }
 
     public void run() throws IOException {
@@ -102,6 +104,10 @@ public class RaftNode {
 
     synchronized public void addVote(int voteTerm) {
         if (voteTerm == this.term) voteCount++;
+    }
+
+    synchronized public void addRobotAddress(Integer id, String[] address) {
+        if (!robotAddresses.containsKey(id)) robotAddresses.put(id, address);
     }
 
     private void startElection() {
@@ -318,9 +324,6 @@ public class RaftNode {
     private String receiveRequestVote(String payload) {
         JsonObject response = new JsonObject();
         JsonObject jsonObject = new JsonParser().parse(payload).getAsJsonObject();
-        HashMap<String, String>  diskInfo= new HashMap<>();
-        HashMap<String, String> termVotedFor = new HashMap<>();
-
 
         //if the sending node's term is at least as high as my term
         //and either I haven't voted yet, or I already voted for this node,
@@ -370,7 +373,6 @@ public class RaftNode {
 
     private String receiveCommand(String payload, int sender, UUID guid) {
         JsonObject response = new JsonObject();
-        if (!robotStates.containsKey(sender)) { robotStates.put(sender, new StateMachine()); }
 
         boolean commandAdded = false;
         if (!state.equals(LEADER)) {
@@ -401,7 +403,8 @@ public class RaftNode {
         if (message.getType().equals(COMMAND)) {
             if (this.state.equals(LEADER)) {
                 messageQueue.add(message);
-            } else {
+            }
+            else {
                 // make a response for the robot and send it back
                 JsonObject jsonObject = new JsonObject();
                 jsonObject.addProperty(TYPE, REDIRECT);
@@ -415,7 +418,8 @@ public class RaftNode {
 
                 this.messageReplies.put(message.getGuid(), jsonObject.toString());
             }
-        } else {
+        }
+        else {
             if (message == null) {
                 System.out.println(Colors.ANSI_RED + ">>>WARNING RaftNode (" + Thread.currentThread().getName() + "): putting NULL message on queue" + Colors.ANSI_RESET);
             }
@@ -485,13 +489,24 @@ public class RaftNode {
             JsonObject response = new JsonObject();
             response.addProperty(TYPE, REACTION);
 
+            if (!robotStates.containsKey(robotActor)) { robotStates.put(robotActor, new StateMachine()); }
+
             if (!robotStates.containsKey(robotActor)) {
                 System.out.println(Colors.ANSI_RED + "WARNING RaftNode (" + Thread.currentThread().getName() + "): Attempting to update non-existent state machine for robot " + currentCommand.get(ROBOT_ID).getAsInt() + Colors.ANSI_RESET);
             }
             else {
                 String action = currentCommand.get(COMMAND).getAsString();
 
-                if (action.equals(StateMachine.PUNCH_LEFT) || action.equals(StateMachine.PUNCH_RIGHT)) {
+                if (action.equals(StateMachine.START)) {
+                    JsonObject addressInfo = currentCommand.get("addressInfo").getAsJsonObject();
+                    String[] addressFields = new String[]{addressInfo.get("address").getAsString(), String.valueOf(addressInfo.get("port").getAsInt()) };
+                    robotAddresses.put(robotActor, addressFields);
+                    System.out.println("Added address for robot " + robotActor + " - " + addressInfo.get("address").getAsString() + ":" + String.valueOf(addressInfo.get("port").getAsInt()));
+
+                    response.addProperty(TYPE, REACTION);
+                    response.addProperty(REACTION, true);
+                }
+                else if (action.equals(StateMachine.PUNCH_LEFT) || action.equals(StateMachine.PUNCH_RIGHT)) {
                     //get the id for the other state machine
                     int otherRobot = 0;
                     for (Integer robot : robotStates.keySet()) {
@@ -500,7 +515,7 @@ public class RaftNode {
                             break;
                         }
                     }
-                    
+
                     robotStates.get(robotActor).checkStates(action, robotStates.get(otherRobot).getState());
                     if (robotStates.get(robotActor).getState().equals(StateMachine.WIN)) {
                         robotStates.get(otherRobot).checkStates(StateMachine.LOST);
